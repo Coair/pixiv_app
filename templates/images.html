@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixiv Downloader - 图片浏览</title>
+<link rel="stylesheet" href="/static/base.css">
+<style>
+
+/* ====== 侧边栏（与 index.html 一致） ====== */
+.sidebar {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 230px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  padding: 24px 0;
+  z-index: 100;
+  display: flex; flex-direction: column;
+}
+
+/* ====== 主内容（与 index.html 一致） ====== */
+.main {
+  margin-left: 230px;
+  padding: 28px 36px;
+  max-width: 1300px;
+}
+.page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 28px;
+}
+.page-title {
+  font-size: 26px; font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+.page-subtitle { font-size: 14px; color: var(--text-muted); margin-top: 2px; }
+
+/* ====== 搜索工具栏（与面板风格一致） ====== */
+.toolbar {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 18px; flex-wrap: wrap;
+}
+.toolbar-search {
+  flex: 1; min-width: 240px; max-width: 400px;
+  padding: 9px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-primary);
+  font-size: 13px; outline: none;
+  transition: border-color var(--transition);
+}
+.toolbar-search:focus { border-color: var(--accent); }
+.toolbar-search::placeholder { color: var(--text-muted); }
+
+/* 活动筛选标签 */
+.active-filters {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 14px; min-height: 0;
+}
+.active-filter-tag {
+  font-size: 11px; padding: 3px 10px; border-radius: 6px;
+  background: var(--accent-dim); color: var(--accent);
+  font-weight: 600; display: inline-flex; align-items: center; gap: 4px;
+}
+.active-filter-tag .remove {
+  cursor: pointer; font-size: 13px; opacity: 0.6; line-height: 1;
+}
+.active-filter-tag .remove:hover { opacity: 1; }
+.filter-clear-inline {
+  font-size: 11px; color: var(--text-muted); cursor: pointer;
+  margin-left: 4px; text-decoration: underline;
+}
+.filter-clear-inline:hover { color: var(--text-primary); }
+
+/* 结果统计 */
+.result-info { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+
+/* ====== 顶部标签栏 ====== */
+.tag-bar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.tag-bar-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.tag-bar-header h3 {
+  font-size: 13px; font-weight: 700;
+  white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+}
+.tag-bar-search {
+  flex: 1; max-width: 260px;
+  padding: 6px 10px; font-size: 12px;
+  margin-bottom: 0;
+}
+.tag-bar-info {
+  font-size: 11px; color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tag-bar-body {
+  padding: 10px 14px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.tag-bar-body::-webkit-scrollbar { width: 4px; }
+.tag-bar-body::-webkit-scrollbar-track { background: transparent; }
+.tag-bar-body::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+
+/* ====== 筛选区域：左侧筛选 + 右侧网格 两列布局 ====== */
+.browse-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.filter-section {
+  position: sticky; top: 28px;
+}
+
+/* 面板样式（与 index.html 一致） */
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-header h3 {
+  font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; gap: 6px;
+}
+.panel-header .count {
+  font-size: 11px; font-weight: 400;
+  color: var(--text-muted);
+}
+.panel-body { padding: 8px 12px; }
+.panel-body.scrollable { max-height: 260px; overflow-y: auto; }
+.panel-body.scrollable::-webkit-scrollbar { width: 3px; }
+.panel-body.scrollable::-webkit-scrollbar-track { background: transparent; }
+.panel-body.scrollable::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+
+/* 搜索框 */
+.input-box {
+  width: 100%; padding: 7px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text-primary);
+  font-size: 12px; outline: none;
+  transition: border-color var(--transition);
+  margin-bottom: 6px;
+}
+.input-box:focus { border-color: var(--accent); }
+.input-box::placeholder { color: var(--text-muted); }
+
+/* 标签云 */
+.tag-cloud { display: flex; flex-wrap: wrap; gap: 5px; }
+.tag-item {
+  font-size: 11px; padding: 3px 8px; border-radius: 5px;
+  background: var(--bg-input); color: var(--text-secondary);
+  cursor: pointer; border: 1px solid transparent;
+  transition: all var(--transition);
+  white-space: nowrap; user-select: none;
+  display: inline-flex; align-items: center; gap: 3px;
+}
+.tag-item:hover { border-color: var(--border-light); color: var(--text-primary); }
+.tag-item.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.tag-item .tag-count { font-size: 9px; opacity: 0.5; }
+
+/* 作者列表 */
+.author-list { max-height: 220px; overflow-y: auto; }
+.author-list::-webkit-scrollbar { width: 3px; }
+.author-list::-webkit-scrollbar-track { background: transparent; }
+.author-list::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+.author-item {
+  font-size: 12px; padding: 5px 6px; border-radius: 5px;
+  color: var(--text-secondary); cursor: pointer;
+  transition: all var(--transition);
+  display: flex; align-items: center; justify-content: space-between;
+  white-space: nowrap; overflow: hidden;
+}
+.author-item:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+.author-item.active { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+.author-item .author-name {
+  overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;
+}
+.author-item .author-count {
+  font-size: 10px; color: var(--text-muted); flex-shrink: 0; margin-left: 6px;
+}
+.author-item.active .author-count { color: var(--accent); opacity: 0.6; }
+
+/* 清空按钮 */
+.btn-clear {
+  width: 100%; padding: 7px; margin-top: 4px;
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 6px; cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-clear:hover { color: var(--text-primary); border-color: var(--border-light); }
+
+/* ====== 图片卡片网格（复用 recent-card 风格，与仪表盘一致） ====== */
+.image-grid-wrapper {
+  /* 包裹网格的面板 */
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+  padding: 12px;
+}
+.image-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.image-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.image-card-thumb {
+  width: 100%;
+  aspect-ratio: 3/4;
+  background: var(--bg-primary);
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.image-card-thumb img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  opacity: 0; transition: opacity 0.4s ease;
+}
+.image-card-thumb img.loaded { opacity: 1; }
+.image-card-skeleton {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, var(--bg-primary) 25%, var(--bg-card) 50%, var(--bg-primary) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.image-card-thumb .no-img {
+  font-size: 32px; color: var(--text-muted); opacity: 0.25;
+}
+.image-card-page-tag {
+  position: absolute; top: 6px; right: 6px;
+  background: rgba(0,0,0,0.7); color: #fff;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 4px;
+  z-index: 2;
+}
+.image-card-body { padding: 8px 10px; }
+.image-card-title {
+  font-size: 12px; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+.image-card-meta {
+  font-size: 11px; color: var(--text-muted);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 6px;
+}
+.image-card-author {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1; min-width: 0;
+}
+.image-card-tags {
+  display: flex; gap: 3px; flex-wrap: nowrap; overflow: hidden;
+  margin-top: 4px;
+}
+.image-card-tag {
+  font-size: 9px; padding: 1px 5px; border-radius: 3px;
+  background: var(--accent-dim); color: var(--accent);
+  white-space: nowrap; flex-shrink: 0;
+}
+
+/* ====== 分页 ====== */
+.pagination {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-top: 20px; padding: 14px 0 4px;
+}
+.page-btn {
+  padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  background: var(--bg-card); color: var(--text-secondary);
+  border: 1px solid var(--border); cursor: pointer;
+  transition: all var(--transition);
+}
+.page-btn:hover:not(:disabled) {
+  border-color: var(--accent); color: var(--accent);
+  background: var(--accent-dim);
+}
+.page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.page-info {
+  font-size: 13px; color: var(--text-secondary); font-weight: 500;
+  min-width: 100px; text-align: center;
+}
+.page-jump {
+  display: flex; align-items: center; gap: 4px;
+}
+.page-jump input {
+  width: 48px; padding: 7px 4px; text-align: center;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text-primary); font-size: 13px;
+  outline: none;
+}
+.page-jump input:focus { border-color: var(--accent); }
+.page-jump span { font-size: 12px; color: var(--text-muted); }
+
+/* ====== 图片查看器（与 index.html 一致） ====== */
+.image-viewer-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+  z-index: 300; display: none; align-items: center; justify-content: center; flex-direction: column;
+}
+.image-viewer-overlay.active { display: flex; }
+.image-viewer-main { position: relative; display: flex; align-items: center; justify-content: center; flex: 1; width: 100%; overflow: hidden; padding: 0 60px; }
+.image-viewer-main img { max-width: 100%; max-height: 85vh; object-fit: contain; border-radius: 4px; box-shadow: 0 4px 40px rgba(0,0,0,0.6); image-rendering: auto; -ms-interpolation-mode: bicubic; }
+.image-viewer-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #fff; font-size: 22px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all var(--transition); z-index: 10;
+}
+.image-viewer-nav:hover { background: rgba(255,255,255,0.2); }
+.image-viewer-nav.prev { left: 10px; }
+.image-viewer-nav.next { right: 10px; }
+.image-viewer-nav:disabled { opacity: 0.3; cursor: not-allowed; }
+.image-viewer-topbar { position: absolute; top: 0; left: 0; right: 0; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 10; }
+.image-viewer-title { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9); max-width: 600px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.image-viewer-page { font-size: 14px; color: rgba(255,255,255,0.7); font-weight: 600; }
+.image-viewer-close {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #fff; font-size: 18px; width: 36px; height: 36px; border-radius: 50%;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--transition);
+}
+.image-viewer-close:hover { background: rgba(255,255,255,0.25); }
+.image-viewer-copy {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #fff; font-size: 16px; width: 36px; height: 36px; border-radius: 50%;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--transition);
+  margin-left: 8px; margin-right: 8px;
+}
+.image-viewer-copy:hover { background: rgba(255,255,255,0.25); }
+.image-viewer-copy.copied { background: rgba(76,175,80,0.5); border-color: rgba(76,175,80,0.7); }
+.image-viewer-pixiv-link {
+  font-size: 12px; font-weight: 600; color: var(--accent);
+  background: rgba(50,145,230,0.2); border: 1px solid rgba(50,145,230,0.4);
+  padding: 5px 12px; border-radius: 6px; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px;
+  transition: all 0.2s; margin-left: auto;
+}
+.image-viewer-pixiv-link:hover { background: rgba(50,145,230,0.35); color: #5aa9f0; }
+.image-viewer-thumbnails { display: flex; align-items: center; gap: 6px; padding: 12px 24px; overflow-x: auto; max-width: 100%; flex-shrink: 0; }
+.image-viewer-thumbnails::-webkit-scrollbar { height: 3px; }
+.image-viewer-thumbnails::-webkit-scrollbar-track { background: transparent; }
+.image-viewer-thumbnails::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+.image-viewer-thumb {
+  width: 56px; height: 56px; border-radius: 6px; overflow: hidden; flex-shrink: 0; cursor: pointer;
+  border: 2px solid transparent; opacity: 0.5; transition: all var(--transition); background: rgba(255,255,255,0.05);
+}
+.image-viewer-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.image-viewer-thumb:hover { opacity: 0.8; border-color: rgba(255,255,255,0.3); }
+.image-viewer-thumb.active { opacity: 1; border-color: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+
+/* ====== 加载/空状态（与 index.html 一致） ====== */
+.empty-state {
+  text-align: center; padding: 40px 20px;
+  color: var(--text-muted); grid-column: 1 / -1;
+}
+.empty-state .icon { font-size: 40px; margin-bottom: 10px; opacity: 0.5; }
+.empty-state p { font-size: 14px; }
+.loading-state {
+  text-align: center; padding: 40px 20px;
+  color: var(--text-muted); grid-column: 1 / -1;
+}
+.spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.4s ease-out; }
+.error-msg { color: var(--red); text-align: center; padding: 20px; font-size: 14px; grid-column: 1 / -1; }
+
+/* ====== 响应式 ====== */
+@media (max-width: 1100px) {
+  .main { padding: 20px 16px; }
+  .browse-layout { grid-template-columns: 170px 1fr; }
+  .image-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+}
+@media (max-width: 850px) {
+  .browse-layout { grid-template-columns: 1fr; }
+  .filter-section { position: static; }
+  .panel-body.scrollable { max-height: 180px; }
+}
+/* ====== 移动端适配 ====== */
+@media (max-width: 768px) {
+  body { overflow-x: hidden; }
+  .sidebar { display: none; }
+  .main { margin-left: 0; padding: 12px 12px 80px 12px; max-width: 100%; }
+  .page-header { flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
+  .page-title { font-size: 20px; }
+  .toolbar-search { width: 100%; max-width: none; min-width: 0; }
+  .browse-layout { grid-template-columns: 1fr; gap: 10px; }
+  .filter-section { position: static; display: flex; flex-direction: column; gap: 8px; }
+  .filter-section .panel { width: 100%; margin-bottom: 0; }
+  .filter-section .btn-clear { width: 100%; margin-top: 0; padding: 9px 14px; }
+  .panel-body.scrollable { max-height: 160px; }
+  /* 顶部标签栏 */
+  .tag-bar { margin-bottom: 10px; }
+  .tag-bar-header { flex-wrap: wrap; gap: 6px; padding: 10px 12px; }
+  .tag-bar-header h3 { font-size: 12px; }
+  .tag-bar-search { max-width: none; flex: 1 1 120px; }
+  .tag-bar-body { max-height: 84px; padding: 8px 10px; }
+  .tag-item { font-size: 11px !important; padding: 3px 7px !important; }
+  #btnTagClear { padding: 4px 10px; font-size: 10px; }
+  .image-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; padding: 8px; }
+  .image-card-body { padding: 6px 8px; }
+  .image-card-title { font-size: 11px; }
+  .image-card-meta { font-size: 10px; }
+  .image-card-tag { font-size: 8px; padding: 1px 4px; }
+  .pagination { gap: 4px; padding: 10px 0 4px; flex-wrap: wrap; }
+  .page-btn { padding: 6px 10px; font-size: 11px; }
+  .page-info { font-size: 11px; min-width: 80px; }
+  .page-jump input { width: 36px; padding: 5px 2px; font-size: 11px; }
+  .image-viewer-nav { width: 36px; height: 36px; font-size: 18px; }
+  .image-viewer-nav.prev { left: 4px; }
+  .image-viewer-nav.next { right: 4px; }
+  .image-viewer-topbar { padding: 10px 14px; }
+  .image-viewer-title { font-size: 12px; max-width: 200px; }
+  .image-viewer-pixiv-link { font-size: 10px; padding: 3px 8px; }
+  .image-viewer-copy { width: 30px; height: 30px; font-size: 14px; margin-left: 4px; margin-right: 4px; }
+  .image-viewer-close { width: 30px; height: 30px; font-size: 14px; }
+  .image-viewer-main { padding: 0 40px; }
+  .image-viewer-thumbnails { padding: 8px 12px; gap: 4px; }
+  .image-viewer-thumb { width: 40px; height: 40px; }
+}
+
+.more-toggle { display: none; }
+</style>
+<script src="/static/common.js"></script>
+</head>
+<body>
+
+<!-- 底部 Tab 导航栏（仅手机端显示） -->
+{% set active_tab = 'images' %}
+{% include '_mobile_nav.html' %}
+
+<!-- 侧边栏 -->
+{% set active_nav = 'images' %}
+{% include '_sidebar.html' %}
+
+<!-- 主内容 -->
+<div class="main">
+    <!-- 页面标题 + 搜索栏 -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">🖼️ 图片浏览</h1>
+            <p class="page-subtitle" id="resultInfo"></p>
+        </div>
+        <input type="text" class="toolbar-search" id="topSearch" placeholder="搜索标题/作者/标签..." autocomplete="off">
+    </div>
+
+    <!-- 顶部标签栏（多选 + AND 逻辑） -->
+    <div class="tag-bar fade-in" id="tagBar">
+        <div class="tag-bar-header">
+            <h3>🏷️ 标签筛选</h3>
+            <input type="text" class="input-box tag-bar-search" id="tagFilter" placeholder="搜索标签..." autocomplete="off">
+            <span class="tag-bar-info" id="tagBarInfo"></span>
+            <button class="btn-clear" style="width:auto;margin-top:0;padding:5px 12px;font-size:11px;" id="btnTagClear">✕ 清空标签</button>
+        </div>
+        <div class="tag-bar-body">
+            <div class="tag-cloud" id="tagCloud">加载中...</div>
+        </div>
+    </div>
+
+    <!-- 活跃筛选标签 -->
+    <div class="active-filters" id="activeFilters"></div>
+
+    <!-- 左侧筛选 + 右侧图片网格 -->
+    <div class="browse-layout fade-in">
+        <!-- 左侧：筛选面板（作者） -->
+        <aside class="filter-section">
+            <div class="panel">
+                <div class="panel-header"><h3>👤 作者</h3><span class="count" id="authorCount"></span></div>
+                <div class="panel-body scrollable">
+                    <input type="text" class="input-box" id="authorFilter" placeholder="筛选作者..." autocomplete="off">
+                    <div class="author-list" id="authorList">加载中...</div>
+                </div>
+            </div>
+            <button class="btn-clear" id="btnClearAll">✕ 清空所有筛选</button>
+        </aside>
+
+        <!-- 右侧：图片网格 -->
+        <div>
+            <div class="image-grid-wrapper">
+                <div class="image-grid" id="imageGrid">
+                    <div class="loading-state"><div class="spinner"></div>加载中...</div>
+                </div>
+            </div>
+
+            <!-- 分页 -->
+            <div class="pagination" id="pagination" style="display:none;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 图片查看器 -->
+<div class="image-viewer-overlay" id="viewerOverlay">
+    <div class="image-viewer-topbar">
+        <span class="image-viewer-title" id="viewerTitle"></span>
+        <span class="image-viewer-page" id="viewerPage"></span>
+        <a class="image-viewer-pixiv-link" id="viewerPixiv" href="#" target="_blank" rel="noopener">🔗 P站</a>
+        <button class="image-viewer-copy copy" id="viewerCopy" title="复制图片到剪贴板">📋</button>
+        <button class="image-viewer-copy" id="viewerCopyFile" title="复制文件本体（仅本地访问）" style="display:none;">📁</button>
+        <button class="image-viewer-close" id="viewerDelete" onclick="viewerDeleteWork()" title="删除整个作品（含本地文件，不可恢复）"
+                style="background:rgba(240,67,81,0.15);border:1px solid rgba(240,67,81,0.45);color:#fff;margin-left:8px;">🗑</button>
+        <button class="image-viewer-close" id="viewerClose">✕</button>
+    </div>
+    <div class="image-viewer-main">
+        <button class="image-viewer-nav prev" id="viewerPrev">‹</button>
+        <img id="viewerImg" src="" alt="">
+        <button class="image-viewer-nav next" id="viewerNext">›</button>
+    </div>
+    <div class="image-viewer-thumbnails" id="viewerThumbs"></div>
+</div>
+
+<script>
+// ====== 状态 ======
+let state = {
+    page: 1,
+    perPage: 40,
+    totalPages: 1,
+    total: 0,
+    tags: [],
+    artistId: 0,
+    search: '',
+    items: [],
+    filterTags: [],
+    filterAuthors: [],
+};
+
+let imgObserver = null;
+const MAX_CONCURRENT = 4;
+let imgActive = 0;
+let imgPending = [];
+
+// ====== 初始化 ======
+document.addEventListener('DOMContentLoaded', () => {
+    if (isLocalHost()) document.getElementById('viewerCopyFile').style.display = '';
+    loadData();
+    bindEvents();
+});
+
+function bindEvents() {
+    const topSearch = document.getElementById('topSearch');
+    let searchTimer;
+
+    function onSearchInput() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            state.search = (topSearch.value || '').trim();
+            syncSearchInputs();
+            state.page = 1;
+            loadImages();
+        }, 300);
+    }
+
+    function onSearchKeydown(e) {
+        if (e.key === 'Enter') {
+            clearTimeout(searchTimer);
+            state.search = topSearch.value.trim();
+            syncSearchInputs();
+            state.page = 1;
+            loadImages();
+        }
+    }
+
+    topSearch.addEventListener('input', onSearchInput);
+    topSearch.addEventListener('keydown', onSearchKeydown);
+
+    document.getElementById('tagFilter').addEventListener('input', function() {
+        renderTagCloud(this.value);
+    });
+    document.getElementById('authorFilter').addEventListener('input', function() {
+        renderAuthorList(this.value);
+    });
+
+    document.getElementById('btnClearAll').addEventListener('click', clearAllFilters);
+    document.getElementById('btnTagClear').addEventListener('click', clearAllTags);
+
+    // 查看器事件
+    document.getElementById('viewerClose').addEventListener('click', closeViewer);
+    document.getElementById('viewerOverlay').addEventListener('click', function(e) {
+        if (e.target === this) closeViewer();
+    });
+    document.getElementById('viewerPrev').addEventListener('click', viewerPrev);
+    document.getElementById('viewerNext').addEventListener('click', viewerNext);
+    document.getElementById('viewerCopy').addEventListener('click', viewerCopy);
+    document.getElementById('viewerCopyFile').addEventListener('click', viewerCopyFile);
+    document.addEventListener('keydown', e => {
+        const ov = document.getElementById('viewerOverlay');
+        if (!ov.classList.contains('active')) return;
+        if (e.key === 'Escape') closeViewer();
+        if (e.key === 'ArrowLeft') viewerPrev();
+        if (e.key === 'ArrowRight') viewerNext();
+    });
+}
+
+function syncSearchInputs() {
+    document.getElementById('topSearch').value = state.search;
+}
+
+// ====== 加载数据 ======
+async function loadData() {
+    await loadImages();
+}
+
+async function loadImages() {
+    const grid = document.getElementById('imageGrid');
+    grid.innerHTML = '<div class="loading-state"><div class="spinner"></div>加载中...</div>';
+    document.getElementById('pagination').style.display = 'none';
+
+    // 清理懒加载
+    if (imgObserver) { imgObserver.disconnect(); imgObserver = null; }
+    imgPending = []; imgActive = 0;
+
+    try {
+        const params = new URLSearchParams({
+            page: state.page, per_page: state.perPage,
+            tags: state.tags.join(','),
+            artist_id: state.artistId, search: state.search
+        });
+        const resp = await fetch('/api/images/browse?' + params);
+        const json = await resp.json();
+        if (!json.success) { grid.innerHTML = `<div class="error-msg">${json.error || '加载失败'}</div>`; return; }
+
+        const d = json.data;
+        state.items = d.items || [];
+        state.total = d.total || 0;
+        state.totalPages = d.total_pages || 1;
+        state.filterTags = d.filter_tags || [];
+        state.filterAuthors = d.filter_authors || [];
+
+        renderTagCloud(document.getElementById('tagFilter').value);
+        renderAuthorList(document.getElementById('authorFilter').value);
+        renderActiveFilters();
+        renderResultInfo();
+        renderImageGrid();
+        renderPagination();
+    } catch (e) {
+        grid.innerHTML = `<div class="error-msg">网络错误: ${e.message}</div>`;
+    }
+}
+
+// ====== 标签云（顶部多选） ======
+function renderTagCloud(filterText) {
+    const cloud = document.getElementById('tagCloud');
+    const infoEl = document.getElementById('tagBarInfo');
+    let tags = state.filterTags;
+    if (filterText) {
+        const lower = filterText.toLowerCase();
+        tags = tags.filter(t => t.tag.toLowerCase().includes(lower));
+    }
+    const selCount = state.tags.length;
+    infoEl.textContent = selCount > 0 ? `已选 ${selCount} 个标签` : (tags.length ? `共 ${tags.length} 个标签` : '');
+    if (!tags.length) { cloud.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:4px;">无匹配标签</div>'; return; }
+
+    const maxCount = tags[0]?.work_count || 1;
+    cloud.innerHTML = tags.map(t => {
+        const ratio = Math.max(0, Math.log(t.work_count) / Math.log(maxCount + 1));
+        const size = 11 + Math.round(ratio * 5);
+        const active = state.tags.includes(t.tag) ? ' active' : '';
+        return `<span class="tag-item${active}" data-tag="${t.tag.replace(/"/g, '&quot;')}"
+                  style="font-size:${size}px;" onclick="toggleTag('${t.tag.replace(/'/g, "\\'")}')">
+                  ${t.tag}<span class="tag-count">${t.work_count}</span></span>`;
+    }).join('');
+}
+
+function toggleTag(tag) {
+    const idx = state.tags.indexOf(tag);
+    if (idx >= 0) {
+        state.tags.splice(idx, 1);
+    } else {
+        state.tags.push(tag);
+    }
+    state.artistId = 0;
+    state.page = 1;
+    loadImages();
+}
+
+function clearAllTags() {
+    state.tags = [];
+    state.page = 1;
+    document.getElementById('tagFilter').value = '';
+    loadImages();
+}
+
+// ====== 作者列表 ======
+function renderAuthorList(filterText) {
+    const list = document.getElementById('authorList');
+    const countEl = document.getElementById('authorCount');
+    let authors = state.filterAuthors;
+    if (filterText) {
+        const lower = filterText.toLowerCase();
+        authors = authors.filter(a =>
+            a.name.toLowerCase().includes(lower) ||
+            (a.account || '').toLowerCase().includes(lower)
+        );
+    }
+    countEl.textContent = authors.length ? `(${authors.length})` : '';
+    if (!authors.length) { list.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:4px;">无匹配作者</div>'; return; }
+
+    list.innerHTML = authors.map(a => {
+        const active = state.artistId === a.id ? ' active' : '';
+        return `<div class="author-item${active}" onclick="selectAuthor(${a.id})">
+            <span class="author-name" title="${(a.name||'')} (${(a.account||'')})">${a.name || '-'}</span>
+            <span class="author-count">${a.img_count}</span>
+        </div>`;
+    }).join('');
+}
+
+function selectAuthor(aid) {
+    state.artistId = state.artistId === aid ? 0 : aid;
+    state.tag = '';
+    state.page = 1;
+    document.getElementById('authorFilter').value = '';
+    loadImages();
+}
+
+// ====== 活跃筛选标签 ======
+function renderActiveFilters() {
+    const el = document.getElementById('activeFilters');
+    const parts = [];
+    state.tags.forEach(tag => {
+        parts.push(
+            `<span class="active-filter-tag">🏷️ ${tag} <span class="remove" onclick="toggleTag('${tag.replace(/'/g,"\\'")}')">×</span></span>`
+        );
+    });
+    if (state.artistId) {
+        const author = state.filterAuthors.find(a => a.id === state.artistId);
+        const name = author ? author.name : '#' + state.artistId;
+        parts.push(`<span class="active-filter-tag">👤 ${name} <span class="remove" onclick="selectAuthor(${state.artistId})">×</span></span>`);
+    }
+    if (state.search) parts.push(
+        `<span class="active-filter-tag">🔍 "${state.search}" <span class="remove" onclick="clearSearch()">×</span></span>`
+    );
+    if (parts.length > 1) parts.push(`<span class="filter-clear-inline" onclick="clearAllFilters()">清空全部</span>`);
+    el.innerHTML = parts.join('');
+}
+
+function clearSearch() {
+    state.search = ''; state.page = 1; syncSearchInputs(); loadImages();
+}
+
+function clearAllFilters() {
+    state.tags = []; state.artistId = 0; state.search = ''; state.page = 1;
+    document.getElementById('tagFilter').value = '';
+    document.getElementById('authorFilter').value = '';
+    syncSearchInputs(); loadImages();
+}
+
+// ====== 结果信息 ======
+function renderResultInfo() {
+    const el = document.getElementById('resultInfo');
+    if (!state.total) { el.textContent = ''; return; }
+    const start = (state.page - 1) * state.perPage + 1;
+    const end = Math.min(state.page * state.perPage, state.total);
+    const filterDesc = (state.tags.length || state.artistId || state.search) ? '（已筛选）' : '';
+    el.textContent = `共 ${state.total} 张图片 · 当前 ${start}-${end}${filterDesc}`;
+}
+
+// ====== 瀑布流渲染 ======
+function renderImageGrid() {
+    const grid = document.getElementById('imageGrid');
+    if (imgObserver) { imgObserver.disconnect(); imgObserver = null; }
+    imgPending = []; imgActive = 0;
+
+    if (!state.items.length) {
+        grid.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>没有找到匹配的图片</p></div>';
+        return;
+    }
+
+    grid.innerHTML = state.items.map((item, i) => {
+        const pageStr = item.page_count > 1
+            ? `<span class="image-card-page-tag">${item.page}/${item.page_count}</span>` : '';
+        const tagsHtml = (item.tags || []).slice(0, 3).map(t =>
+            `<span class="image-card-tag">${t}</span>`
+        ).join('');
+        return `
+        <div class="image-card fade-in" onclick="openViewer(${i})">
+            <div class="image-card-thumb" data-img-idx="${i}">
+                <div class="image-card-skeleton"></div>
+                ${pageStr}
+            </div>
+            <div class="image-card-body">
+                <div class="image-card-title"
+                     title="${(item.work_title||'无标题').replace(/"/g,'&quot;')}">
+                     ${item.work_title || '无标题'}
+                </div>
+                <div class="image-card-meta">
+                    <span class="image-card-author"
+                          title="${(item.artist_name||'').replace(/"/g,'&quot;')}">
+                          👤 ${item.artist_name || '-'}
+                    </span>
+                    <span>${formatFileSize(item.file_size)}</span>
+                </div>
+                ${tagsHtml ? `<div class="image-card-tags">${tagsHtml}</div>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+
+    // 懒加载
+    imgObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const thumb = entry.target;
+                const idx = parseInt(thumb.getAttribute('data-img-idx'));
+                const item = state.items[idx];
+                if (item && item.file_path) {
+                    imgPending.push({ thumb, path: item.file_path });
+                    processImgQueue();
+                }
+                imgObserver.unobserve(thumb);
+            }
+        });
+    }, { rootMargin: '350px', threshold: 0 });
+
+    grid.querySelectorAll('.image-card-thumb[data-img-idx]').forEach(el => {
+        imgObserver.observe(el);
+    });
+}
+
+function processImgQueue() {
+    while (imgActive < MAX_CONCURRENT && imgPending.length > 0) {
+        const { thumb, path } = imgPending.shift();
+        imgActive++;
+        loadCardImage(thumb, path);
+    }
+}
+
+function onImgDone() { imgActive--; processImgQueue(); }
+
+function loadCardImage(thumbEl, filePath) {
+    const skeleton = thumbEl.querySelector('.image-card-skeleton');
+    const img = document.createElement('img');
+    img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
+
+    img.onload = function() {
+        if (skeleton) skeleton.remove();
+        img.classList.add('loaded');
+        onImgDone();
+    };
+    img.onerror = function() {
+        if (skeleton) {
+            skeleton.className = 'no-img';
+            skeleton.innerHTML = '';
+            skeleton.style.cssText =
+                'position:absolute;inset:0;display:flex;align-items:center;' +
+                'justify-content:center;font-size:32px;color:var(--text-muted);opacity:0.25;';
+            const sp = document.createElement('span');
+            sp.textContent = '🖼️';
+            skeleton.appendChild(sp);
+        }
+        img.remove();
+        onImgDone();
+    };
+
+    // 网格缩略图走缩略图接口（240px 缓存），避免加载原图（每张数 MB）
+    img.src = '/thumbnail/' + encodeURIComponent(filePath);
+    thumbEl.insertBefore(img, thumbEl.firstChild);
+}
+
+function formatFileSize(bytes) {
+    if (!bytes || bytes === 0) return '';
+    if (bytes < 1024) return bytes + 'B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + 'KB';
+    return (bytes / 1048576).toFixed(1) + 'MB';
+}
+
+// ====== 分页 ======
+function renderPagination() {
+    const el = document.getElementById('pagination');
+    if (state.totalPages <= 1) { el.style.display = 'none'; return; }
+    el.style.display = 'flex';
+    el.innerHTML = `
+        <button class="page-btn" ${state.page <= 1 ? 'disabled' : ''}
+                onclick="goPage(${state.page - 1})">&larr; 上一页</button>
+        <span class="page-info">第 ${state.page} / ${state.totalPages} 页</span>
+        <button class="page-btn" ${state.page >= state.totalPages ? 'disabled' : ''}
+                onclick="goPage(${state.page + 1})">下一页 &rarr;</button>
+        <span class="page-jump">
+            <input type="number" id="jumpPage" min="1" max="${state.totalPages}"
+                   value="${state.page}"
+                   onkeydown="if(event.key==='Enter')goPage(parseInt(this.value))">
+            <span>/ ${state.totalPages}</span>
+        </span>`;
+}
+
+function goPage(p) {
+    p = Math.max(1, Math.min(p, state.totalPages));
+    if (p === state.page) return;
+    state.page = p;
+    loadImages();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ====== 图片查看器 ======
+let viewerItems = [];
+let viewerIdx = 0;
+
+function openViewer(i) {
+    viewerItems = state.items.filter(it => it.file_path);
+    viewerIdx = viewerItems.findIndex((it, idx) =>
+        idx === i && it.file_path === state.items[i].file_path
+    );
+    if (viewerIdx < 0) viewerIdx = 0;
+
+    const item = state.items[i];
+    document.getElementById('viewerTitle').textContent = item?.work_title || '无标题';
+    document.getElementById('viewerPixiv').href = item?.work_id
+        ? `https://www.pixiv.net/artworks/${item.work_id}` : '#';
+
+    document.getElementById('viewerOverlay').classList.add('active');
+    showViewerImg();
+    renderThumbnails();
+    document.body.style.overflow = 'hidden';
+
+    // 绑键盘
+    document.addEventListener('keydown', viewerKeyHandler);
+}
+
+function closeViewer() {
+    document.getElementById('viewerOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+    viewerItems = [];
+    document.removeEventListener('keydown', viewerKeyHandler);
+}
+
+function viewerKeyHandler(e) {
+    const ov = document.getElementById('viewerOverlay');
+    if (!ov.classList.contains('active')) return;
+    if (e.key === 'Escape') closeViewer();
+    else if (e.key === 'ArrowLeft') viewerPrev();
+    else if (e.key === 'ArrowRight') viewerNext();
+}
+
+function showViewerImg() {
+    const item = viewerItems[viewerIdx];
+    if (!item) return;
+    const imgEl = document.getElementById('viewerImg');
+    imgEl.src = '/original/' + encodeURIComponent(item.file_path);
+    document.getElementById('viewerPage').textContent =
+        `${viewerIdx + 1} / ${viewerItems.length}`;
+    document.getElementById('viewerPrev').disabled = viewerIdx <= 0;
+    document.getElementById('viewerNext').disabled = viewerIdx >= viewerItems.length - 1;
+
+    // 更新缩略图高亮
+    document.querySelectorAll('.image-viewer-thumb').forEach((t, i) => {
+        t.classList.toggle('active', i === viewerIdx);
+    });
+}
+
+function viewerPrev() { if (viewerIdx > 0) { viewerIdx--; showViewerImg(); } }
+function viewerNext() { if (viewerIdx < viewerItems.length - 1) { viewerIdx++; showViewerImg(); } }
+
+function renderThumbnails() {
+    const container = document.getElementById('viewerThumbs');
+    container.innerHTML = viewerItems.map((img, i) =>
+        `<div class="image-viewer-thumb ${i === viewerIdx ? 'active' : ''}" onclick="viewerGoTo(${i})"
+             title="第${img.page || i+1}页">
+             <img src="/thumbnail/${encodeURIComponent(img.file_path)}" alt=""
+                  onerror="this.parentElement.style.display='none'"
+                  loading="lazy">
+         </div>`
+    ).join('');
+}
+
+function viewerGoTo(idx) { if (idx >= 0 && idx < viewerItems.length) { viewerIdx = idx; showViewerImg(); } }
+
+async function viewerCopy() {
+    const item = viewerItems[viewerIdx];
+    if (!item?.file_path) return;
+    const btn = document.getElementById('viewerCopy');
+    btn.disabled = true; btn.classList.add('copied');
+
+    try {
+        // 直接 fetch 原图，拿到原始格式 blob（保持原格式原质量，本地/局域网均最优）
+        const resp = await fetch('/original/' + encodeURIComponent(item.file_path));
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        const mime = blob.type || 'image/png';
+        await navigator.clipboard.write([new ClipboardItem({ [mime]: blob })]);
+        btn.textContent = '✅';   // 成功：图标即时反馈，不弹窗
+    } catch (e) {
+        btn.textContent = '❌';
+        console.error('复制失败:', e);
+    }
+
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('copied'); btn.textContent = '📋'; }, 1400);
+}
+
+async function viewerCopyFile() {
+    const item = viewerItems[viewerIdx];
+    if (!item?.file_path) return;
+    const btn = document.getElementById('viewerCopyFile');
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/image/copy-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file_path: item.file_path })
+        });
+        const d = await r.json();
+        if (d.success) {
+            btn.textContent = '✅';   // 成功：图标即时反馈，不弹窗
+        } else {
+            btn.textContent = '❌';
+            console.error('复制文件失败:', d.error);
+        }
+    } catch (e) {
+        btn.textContent = '❌';
+        console.error('复制文件失败:', e.message);
+    }
+    setTimeout(() => { btn.disabled = false; btn.textContent = '📁'; }, 1400);
+}
+
+async function viewerDeleteWork() {
+    const item = viewerItems[viewerIdx];
+    if (!item?.work_id) { showToast('无法确定当前作品', 'error'); return; }
+    const wid = item.work_id;
+    if (!confirm(`⚠️ 确定删除作品 ${wid}「${(item.work_title || '').slice(0, 30)}」吗？\n\n将同时删除其本地图片文件与缩略图，不可恢复！`)) return;
+    try {
+        const r = await fetch(`/api/work/${wid}/delete`, { method: 'POST' });
+        const d = await r.json();
+        if (d.success) {
+            showToast(d.message || '已删除', 'success');
+            closeViewer();
+            state.page = 1;
+            loadImages();
+        } else {
+            showToast(d.error || '删除失败', 'error');
+        }
+    } catch (e) {
+        showToast('请求失败: ' + e.message, 'error');
+    }
+}
+</script>
+</body>
+</html>

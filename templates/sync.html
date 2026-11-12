@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixiv Downloader - 本地同步</title>
+<link rel="stylesheet" href="/static/base.css">
+<style>
+
+.sidebar {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 230px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  padding: 24px 0; z-index: 100;
+  display: flex; flex-direction: column;
+}
+
+.main {
+  margin-left: 230px;
+  padding: 28px 36px;
+  max-width: 1100px;
+}
+.page-title {
+  font-size: 26px; font-weight: 800;
+  margin-bottom: 28px;
+  letter-spacing: -0.5px;
+}
+
+/* ====== 双栏布局 ====== */
+.sync-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+@media (max-width: 900px) {
+  .sync-grid { grid-template-columns: 1fr; }
+}
+
+/* ====== 操作卡片 ====== */
+.action-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  transition: all var(--transition);
+}
+.action-panel:hover { border-color: var(--border-light); }
+.action-panel-icon {
+  width: 48px; height: 48px;
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; margin-bottom: 16px;
+}
+.action-panel-icon.blue { background: var(--accent-dim); color: var(--accent); }
+.action-panel-icon.purple { background: var(--purple-dim); color: var(--purple); }
+.action-panel h2 {
+  font-size: 17px; font-weight: 700;
+  margin-bottom: 6px;
+}
+.action-panel p {
+  font-size: 13px; color: var(--text-muted);
+  margin-bottom: 20px; line-height: 1.6;
+}
+.action-panel .info-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-muted);
+  padding: 8px 12px;
+  background: var(--bg-input);
+  border-radius: var(--radius-xs);
+  margin-bottom: 16px;
+}
+.action-panel .info-row code {
+  color: var(--accent); font-size: 12px;
+  word-break: break-all;
+}
+
+.btn {
+  padding: 10px 24px; border: none; border-radius: var(--radius-xs);
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: all var(--transition);
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #287dc4; }
+.btn-outline {
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+.btn-outline:hover:not(:disabled) { color: var(--text-primary); border-color: var(--border-light); }
+
+/* ====== 进度区 ====== */
+.progress-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+  display: none;
+  animation: fadeIn 0.3s ease-out;
+}
+.progress-section.active { display: block; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.progress-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.progress-header .title {
+  font-size: 16px; font-weight: 700;
+  display: flex; align-items: center; gap: 10px;
+}
+.progress-header .percent {
+  font-size: 28px; font-weight: 800;
+  color: var(--accent);
+}
+.progress-bar-wrap {
+  width: 100%; height: 8px;
+  background: var(--bg-input);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--purple));
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  width: 0%;
+}
+.progress-msg {
+  font-size: 13px; color: var(--text-muted);
+}
+.progress-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600;
+  padding: 4px 10px; border-radius: 6px;
+}
+.progress-status.running { background: var(--green-dim); color: var(--green); }
+.progress-status.paused { background: var(--orange-dim); color: var(--orange); }
+.progress-status.completed { background: var(--green-dim); color: var(--green); }
+.progress-status.failed { background: var(--red-dim); color: var(--red); }
+
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.running { background: var(--green); animation: pulse 1.5s infinite; }
+.status-dot.paused { background: var(--orange); animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* ====== 日志窗口 ====== */
+.log-section {
+  background: #0a0d12;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 20px;
+}
+.log-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.log-header h3 {
+  font-size: 14px; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 8px;
+}
+.log-content {
+  max-height: 380px; overflow-y: auto;
+  padding: 12px 18px;
+  font-family: 'Consolas', 'SF Mono', 'Monaco', monospace;
+  font-size: 12px; line-height: 1.7;
+}
+.log-content::-webkit-scrollbar { width: 4px; }
+.log-content::-webkit-scrollbar-track { background: transparent; }
+.log-content::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+
+.log-line { padding: 2px 0; display: flex; gap: 8px; }
+.log-line .time { color: var(--text-muted); flex-shrink: 0; opacity: 0.6; }
+.log-line.info .msg { color: var(--text-secondary); }
+.log-line.success .msg { color: var(--green); }
+.log-line.error .msg { color: var(--red); }
+.log-line.progress .msg { color: var(--accent); }
+.log-line.warn .msg { color: var(--orange); }
+
+/* ====== 结果区 ====== */
+.result-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+  display: none;
+  animation: fadeIn 0.3s ease-out;
+}
+.result-section.active { display: block; }
+.result-section h2 {
+  font-size: 16px; font-weight: 700;
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+.result-item {
+  text-align: center; padding: 16px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.result-item .val {
+  font-size: 26px; font-weight: 800;
+  color: var(--accent);
+}
+.result-item .val.red { color: var(--red); }
+.result-item .val.green { color: var(--green); }
+.result-item .lbl {
+  font-size: 12px; color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ====== 验证结果 ====== */
+.verify-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+  display: none;
+  animation: fadeIn 0.3s ease-out;
+}
+.verify-section.active { display: block; }
+
+.verify-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.verify-summary-item {
+  text-align: center; padding: 14px 10px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.verify-summary-item:hover { border-color: var(--accent); }
+.verify-summary-item.selected { border-color: var(--accent); background: var(--accent-dim); }
+.verify-summary-item .count { font-size: 24px; font-weight: 800; }
+.verify-summary-item .count.red { color: var(--red); }
+.verify-summary-item .count.green { color: var(--green); }
+.verify-summary-item .count.orange { color: var(--orange); }
+.verify-summary-item .label { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+.verify-category {
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: none;
+}
+.verify-category.active { display: block; }
+.verify-category-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+.verify-category-header:hover { background: var(--bg-card-hover); }
+.verify-category-header .cat-title {
+  font-size: 14px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+}
+.verify-category-header .cat-count {
+  font-size: 13px; color: var(--text-muted);
+  display: flex; align-items: center; gap: 8px;
+}
+.verify-category-body {
+  max-height: 420px; overflow-y: auto;
+  padding: 8px 0;
+}
+.verify-category-body::-webkit-scrollbar { width: 4px; }
+.verify-category-body::-webkit-scrollbar-track { background: transparent; }
+.verify-category-body::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+
+.verify-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 18px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  transition: background var(--transition);
+}
+.verify-item:last-child { border-bottom: none; }
+.verify-item:hover { background: var(--bg-secondary); }
+.verify-item input[type="checkbox"] {
+  width: 16px; height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.verify-item .vi-info { flex: 1; min-width: 0; }
+.verify-item .vi-main { color: var(--text-primary); word-break: break-all; }
+.verify-item .vi-sub { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+.verify-item .vi-badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 4px;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+.vi-badge.missing { background: var(--red-dim); color: var(--red); }
+.vi-badge.orphan { background: var(--orange-dim); color: var(--orange); }
+.vi-badge.broken { background: var(--red-dim); color: var(--red); }
+.vi-badge.mismatch { background: var(--orange-dim); color: var(--orange); }
+
+.verify-actions {
+  display: flex; gap: 10px; align-items: center;
+  margin-top: 16px; padding-top: 16px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.verify-actions .select-info {
+  font-size: 12px; color: var(--text-muted);
+  margin-right: auto;
+}
+.btn-danger {
+  background: var(--red); color: #fff;
+}
+.btn-danger:hover:not(:disabled) { background: #d63c48; }
+.btn-success {
+  background: var(--green); color: #fff;
+}
+.btn-success:hover:not(:disabled) { background: #009d64; }
+
+/* ====== 通用 ====== */
+.empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+.empty-state .icon { font-size: 40px; margin-bottom: 10px; opacity: 0.5; }
+.empty-state p { font-size: 14px; }
+.loading-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+.spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.error-msg { color: var(--red); text-align: center; padding: 20px; font-size: 14px; }
+/* ====== 手机端适配 ====== */
+@media (max-width: 768px) {
+  .main { margin-left: 0; padding: 12px 12px 80px; max-width: 100%; }
+  .page-title { font-size: 20px; }
+
+  .sync-grid { grid-template-columns: 1fr; gap: 12px; }
+  .action-panel { padding: 16px; }
+  .action-panel h2 { font-size: 15px; }
+  .action-panel p { font-size: 12px; }
+  .info-row { flex-wrap: wrap; gap: 6px; }
+
+  .btn { min-height: 42px; }
+
+  .log-content { max-height: 240px; font-size: 11px; padding: 10px 12px; }
+  .log-line { gap: 6px; }
+
+  .progress-header { flex-wrap: wrap; gap: 6px; }
+
+  .result-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .result-item { padding: 12px 8px; }
+  .result-item .val { font-size: 22px; }
+
+  .verify-summary { grid-template-columns: repeat(2, 1fr); }
+  .verify-category-header { flex-wrap: wrap; gap: 6px; }
+  .verify-actions { flex-wrap: wrap; }
+  .verify-actions .btn { flex: 1 1 100%; }
+}
+</style>
+<script src="/static/common.js"></script>
+</head>
+<body>
+
+{% set active_tab = 'sync' %}
+{% include '_mobile_nav.html' %}
+
+{% set active_nav = 'sync' %}
+{% include '_sidebar.html' %}
+
+<div class="main">
+    <h1 class="page-title">🔄 本地同步</h1>
+
+    <!-- 操作卡片 -->
+    <div class="sync-grid">
+        <div class="action-panel">
+            <div class="action-panel-icon blue">📂</div>
+            <h2>扫描本地文件</h2>
+            <p>同步下载目录中的图片到数据库。<b>增量扫描</b>只处理有变动的作者目录，秒级完成；<b>全量扫描</b>逐目录完整扫描。适合在手动复制/整理文件后执行。</p>
+            <div class="info-row">
+                <span>📁 扫描目录:</span>
+                <code id="scanDir">-</code>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <button class="btn btn-primary" id="btnSyncInc" onclick="startSync('incremental')">⚡ 增量扫描</button>
+                <button class="btn btn-outline" id="btnSyncFull" onclick="startSync('full')">📂 全量扫描</button>
+            </div>
+        </div>
+
+        <div class="action-panel">
+            <div class="action-panel-icon purple">✅</div>
+            <h2>数据库完整性验证</h2>
+            <p>检查数据库中记录的图片文件是否实际存在，找出缺失文件。适合在清理文件后执行。</p>
+            <div class="info-row">
+                <span>📊 检查范围:</span>
+                <span style="color:var(--text-secondary);">所有已记录的图片文件</span>
+            </div>
+            <button class="btn btn-outline" id="btnVerify" onclick="startVerify()">🔍 开始验证</button>
+        </div>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="progress-section" id="progressSection">
+        <div class="progress-header">
+            <span class="title">
+                <span class="progress-status running" id="progressStatus">
+                    <span class="status-dot running"></span> 进行中
+                </span>
+                <span id="progressTitle">准备中...</span>
+            </span>
+            <span class="percent" id="progressPercent">0%</span>
+        </div>
+        <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+        <div class="progress-msg" id="progressMsg">等待开始...</div>
+    </div>
+
+    <!-- 日志窗口 -->
+    <div class="log-section" id="logSection">
+        <div class="log-header">
+            <h3>📋 操作日志</h3>
+            <button class="btn btn-outline" style="padding:5px 12px;font-size:12px;" onclick="clearLog()">清空</button>
+        </div>
+        <div class="log-content" id="logContent">
+            <div class="log-line info"><span class="time">--:--</span><span class="msg">等待操作...</span></div>
+        </div>
+    </div>
+
+    <!-- 同步历史 -->
+    <div class="result-section active" style="padding:18px 24px;display:block;">
+        <h2 style="font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+            📅 同步历史
+            <span style="font-size:11px;color:var(--text-muted);font-weight:400;" id="historyCount"></span>
+        </h2>
+        <div id="syncHistoryList">
+            <div class="loading-state" style="padding:14px;">加载中...</div>
+        </div>
+    </div>
+
+    <!-- 扫描结果 -->
+    <div class="result-section" id="resultSection">
+        <h2>📊 扫描结果</h2>
+        <div class="result-grid" id="resultGrid"></div>
+    </div>
+
+    <!-- 验证结果 -->
+    <div class="verify-section" id="verifySection">
+        <h2 id="verifyTitle">🔍 验证结果</h2>
+        <div class="verify-summary" id="verifySummary"></div>
+        <div id="verifyCategories"></div>
+        <div class="verify-actions" id="verifyActions" style="display:none;">
+            <span class="select-info" id="selectInfo">已选择 0 项</span>
+            <button class="btn btn-outline" onclick="selectAllIssues()">全选当前分类</button>
+            <button class="btn btn-outline" onclick="deselectAllIssues()">取消全选</button>
+            <button class="btn btn-outline" id="btnFixAllPages" onclick="fixAllPageCounts()" style="display:none;">🔢 一键修复全部页数不匹配</button>
+            <button class="btn btn-success" id="btnFix" onclick="executeFix()">🔧 执行修复</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let eventSource = null;
+let watchingTaskId = null;
+let currentTaskLabel = '任务';   // 当前任务名称（用于标题展示）
+
+// ====== 日志 ======
+function addLog(msg, type) {
+    type = type || 'info';
+    const log = document.getElementById('logContent');
+    const now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    const line = document.createElement('div');
+    line.className = `log-line ${type}`;
+    line.innerHTML = `<span class="time">${now}</span><span class="msg">${msg}</span>`;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+    while (log.children.length > 300) log.removeChild(log.firstChild);
+}
+
+function clearLog() {
+    document.getElementById('logContent').innerHTML = '<div class="log-line info"><span class="time">--:--</span><span class="msg">日志已清空</span></div>';
+    document.getElementById('resultSection').classList.remove('active');
+    document.getElementById('verifySection').classList.remove('active');
+}
+
+function restoreLogs(logs) {
+    const log = document.getElementById('logContent');
+    log.innerHTML = '';
+    if (!logs || logs.length === 0) {
+        log.innerHTML = '<div class="log-line info"><span class="time">--:--</span><span class="msg">等待操作...</span></div>';
+        return;
+    }
+    logs.forEach(l => {
+        const line = document.createElement('div');
+        line.className = `log-line ${l.type || 'info'}`;
+        line.innerHTML = `<span class="time">${l.time || '--:--'}</span><span class="msg">${l.message}</span>`;
+        log.appendChild(line);
+    });
+    log.scrollTop = log.scrollHeight;
+}
+
+// ====== 进度条 ======
+function resetProgress() {
+    document.getElementById('progressSection').classList.remove('active');
+    document.getElementById('resultSection').classList.remove('active');
+    document.getElementById('verifySection').classList.remove('active');
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('progressPercent').textContent = '0%';
+    document.getElementById('progressMsg').textContent = '等待开始...';
+    document.getElementById('progressTitle').textContent = '准备中...';
+}
+
+// ====== SSE ======
+function connectSSE(taskId, label) {
+    if (eventSource) eventSource.close();
+    watchingTaskId = taskId;
+    if (label) currentTaskLabel = label;
+    resetProgress();
+    // resetProgress 会把标题重置为"准备中..."，这里恢复为真实任务名
+    document.getElementById('progressTitle').textContent = currentTaskLabel;
+    clearLog();
+    addLog(`连接任务 ${taskId}...`, 'info');
+
+    eventSource = new EventSource(`/api/stream/${taskId}`);
+
+    eventSource.addEventListener('connected', async (e) => {
+        const d = JSON.parse(e.data);
+        addLog(`已连接: ${d.task_id}`, 'info');
+        // 恢复历史日志
+        try {
+            const r = await fetch(`/api/task/${taskId}/status`);
+            const resp = await r.json();
+            if (resp.success && resp.data && resp.data.logs) {
+                restoreLogs(resp.data.logs);
+            }
+            // 恢复进度
+            if (resp.success && resp.data && resp.data.progress) {
+                const p = resp.data.progress;
+                if (p.total > 0) {
+                    document.getElementById('progressSection').classList.add('active');
+                    document.getElementById('progressBar').style.width = `${Math.round(p.current / p.total * 100)}%`;
+                    document.getElementById('progressPercent').textContent = `${Math.round(p.current / p.total * 100)}%`;
+                    document.getElementById('progressMsg').textContent = p.message;
+                }
+            }
+
+            // 任务若在连接前/断线期间已结束，直接收尾，避免一直停在"准备中/进行中"
+            const st = (resp.success && resp.data) ? resp.data.status : null;
+            if (st === 'completed') {
+                document.getElementById('progressSection').classList.add('active');
+                document.getElementById('progressBar').style.width = '100%';
+                document.getElementById('progressPercent').textContent = '100%';
+                document.getElementById('progressMsg').textContent = '完成!';
+                document.getElementById('progressTitle').textContent = currentTaskLabel + '（已完成）';
+                document.getElementById('progressStatus').className = 'progress-status completed';
+                document.getElementById('progressStatus').innerHTML = '✅ 已完成';
+                closeSSE();
+            } else if (st === 'failed' || st === 'cancelled') {
+                document.getElementById('progressSection').classList.add('active');
+                document.getElementById('progressTitle').textContent =
+                    currentTaskLabel + (st === 'failed' ? '（失败）' : '（已取消）');
+                document.getElementById('progressStatus').className =
+                    'progress-status ' + (st === 'failed' ? 'failed' : 'paused');
+                document.getElementById('progressStatus').innerHTML =
+                    st === 'failed' ? '❌ 失败' : '⏹ 已取消';
+                closeSSE();
+            }
+        } catch(e) { console.error(e); }
+    });
+
+    eventSource.addEventListener('progress', (e) => {
+        const d = JSON.parse(e.data);
+        document.getElementById('progressSection').classList.add('active');
+        document.getElementById('progressBar').style.width = d.total > 0 ? `${Math.round(d.current / d.total * 100)}%` : '0%';
+        document.getElementById('progressPercent').textContent = d.total > 0 ? `${Math.round(d.current / d.total * 100)}%` : '...';
+        document.getElementById('progressMsg').textContent = d.message;
+    });
+
+    eventSource.addEventListener('complete', (e) => {
+        const d = JSON.parse(e.data);
+        document.getElementById('progressBar').style.width = '100%';
+        document.getElementById('progressPercent').textContent = '100%';
+        document.getElementById('progressMsg').textContent = '完成!';
+        document.getElementById('progressTitle').textContent = currentTaskLabel + '（已完成）';
+        document.getElementById('progressStatus').className = 'progress-status completed';
+        document.getElementById('progressStatus').innerHTML = '✅ 已完成';
+        addLog('✅ 操作完成!', 'success');
+
+        // 显示结果（扫描任务）
+        if (d.total_dirs !== undefined) {
+            document.getElementById('resultSection').classList.add('active');
+            document.getElementById('resultGrid').innerHTML = `
+                ${`<div class="result-item"><div class="val">${d.total_dirs}</div><div class="lbl">作者目录</div></div>`}
+                ${d.scanned_dirs !== undefined ? `<div class="result-item"><div class="val green">${d.scanned_dirs}</div><div class="lbl">扫描目录</div></div>` : ''}
+                ${d.skipped_dirs !== undefined && d.skipped_dirs > 0 ? `<div class="result-item"><div class="val">${d.skipped_dirs}</div><div class="lbl">跳过(无变化)</div></div>` : ''}
+                ${`<div class="result-item"><div class="val">${d.total_files}</div><div class="lbl">扫描文件</div></div>`}
+                ${`<div class="result-item"><div class="val green">${d.new_images || 0}</div><div class="lbl">新增记录</div></div>`}
+                ${d.new_artists > 0 ? `<div class="result-item"><div class="val">${d.new_artists}</div><div class="lbl">新作者</div></div>` : ''}
+                ${d.errors > 0 ? `<div class="result-item"><div class="val red">${d.errors}</div><div class="lbl">错误</div></div>` : ''}
+            `;
+        }
+        // 显示结果（其他任务）
+        else if (d.scanned !== undefined || d.found !== undefined) {
+            document.getElementById('resultSection').classList.add('active');
+            document.getElementById('resultGrid').innerHTML = `
+                ${d.scanned !== undefined ? `<div class="result-item"><div class="val green">${d.scanned}</div><div class="lbl">扫描文件</div></div>` : ''}
+                ${d.added !== undefined ? `<div class="result-item"><div class="val">${d.added}</div><div class="lbl">新增记录</div></div>` : ''}
+                ${d.updated !== undefined ? `<div class="result-item"><div class="val">${d.updated}</div><div class="lbl">更新记录</div></div>` : ''}
+                ${d.skipped !== undefined ? `<div class="result-item"><div class="val">${d.skipped}</div><div class="lbl">跳过</div></div>` : ''}
+                ${d.found !== undefined ? `<div class="result-item"><div class="val green">${d.found}</div><div class="lbl">找到图片</div></div>` : ''}
+                ${d.existing !== undefined ? `<div class="result-item"><div class="val">${d.existing}</div><div class="lbl">已存在</div></div>` : ''}
+                ${d.missing !== undefined ? `<div class="result-item"><div class="val red">${d.missing}</div><div class="lbl">缺失</div></div>` : ''}
+            `;
+        }
+
+        closeSSE();
+    });
+
+    eventSource.addEventListener('error', (e) => {
+        try {
+            const d = JSON.parse(e.data);
+            addLog('❌ 错误: ' + d.error, 'error');
+            document.getElementById('progressStatus').className = 'progress-status failed';
+            document.getElementById('progressStatus').innerHTML = '❌ 失败';
+            document.getElementById('progressMsg').textContent = d.error || '任务失败';
+            document.getElementById('progressTitle').textContent = currentTaskLabel + '（失败）';
+        } catch {}
+        closeSSE();
+    });
+
+    eventSource.onerror = () => {
+        addLog('⚠️ 连接断开，3秒后重连...', 'warn');
+        closeSSE();
+        setTimeout(() => {
+            if (watchingTaskId) {
+                addLog('重连中...', 'info');
+                connectSSE(watchingTaskId);
+            }
+        }, 3000);
+    };
+}
+
+function closeSSE() {
+    if (eventSource) { eventSource.close(); eventSource = null; }
+    watchingTaskId = null;
+    setSyncButtons(false);
+    const btnFix = document.getElementById('btnFix');
+    if (btnFix) btnFix.disabled = false;
+}
+
+/**
+ * 等待一个任务完成（基于轮询的 Promise 封装）
+ * 用于增量下载场景，不干扰当前的 SSE 连接
+ */
+function watchTask(taskId) {
+    return new Promise((resolve, reject) => {
+        const poll = async () => {
+            try {
+                const r = await fetch(`/api/task/${taskId}/status`);
+                const d = await r.json();
+                if (!d.success) {
+                    reject(new Error(d.error || '获取任务状态失败'));
+                    return;
+                }
+                const status = d.data.status;
+                if (status === 'completed') {
+                    resolve(d.data);
+                } else if (status === 'failed' || status === 'cancelled') {
+                    reject(new Error(status === 'cancelled' ? '任务已取消' : (d.data.error || '任务失败')));
+                } else {
+                    // 仍在运行，1秒后重试
+                    setTimeout(poll, 1000);
+                }
+            } catch(e) {
+                reject(e);
+            }
+        };
+        poll();
+    });
+}
+
+// ====== 扫描同步 ======
+function setSyncButtons(disabled) {
+    document.getElementById('btnSyncInc').disabled = disabled;
+    document.getElementById('btnSyncFull').disabled = disabled;
+    document.getElementById('btnVerify').disabled = disabled;
+}
+
+async function startSync(mode) {
+    mode = mode || 'incremental';
+    setSyncButtons(true);
+    resetProgress();
+    clearLog();
+    addLog(mode === 'full' ? '📂 提交全量扫描任务...' : '⚡ 提交增量扫描任务...', 'info');
+
+    try {
+        const taskId = 'sync_' + Date.now();
+        const r = await fetch('/api/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId, mode: mode })
+        });
+        const d = await r.json();
+        if (d.success) {
+            addLog(`任务已提交: ${d.task_id}`, 'success');
+            document.getElementById('progressSection').classList.add('active');
+            document.getElementById('progressStatus').className = 'progress-status running';
+            document.getElementById('progressStatus').innerHTML = '<span class="status-dot running"></span> 进行中';
+            connectSSE(d.task_id, mode === 'full' ? '全量扫描' : '增量扫描');
+        } else {
+            addLog('提交失败: ' + (d.error || '未知错误'), 'error');
+            setSyncButtons(false);
+        }
+    } catch(e) {
+        addLog('请求失败: ' + e.message, 'error');
+        setSyncButtons(false);
+    }
+}
+
+// ====== 完整性验证 ======
+
+// 8类异常的分类定义
+const ISSUE_CATEGORIES = [
+    { key: 'missing_files',      icon: '❌', label: '文件缺失',       desc: '数据库有记录但磁盘文件不存在', badge: 'missing' },
+    { key: 'orphan_files',       icon: '📄', label: '孤儿文件',       desc: '磁盘有文件但数据库无记录',     badge: 'orphan' },
+    { key: 'orphan_works',       icon: '📋', label: '孤儿作品',       desc: '作品无关联图片',               badge: 'orphan' },
+    { key: 'orphan_artists',     icon: '👤', label: '孤儿作者',       desc: '作者无关联作品',               badge: 'orphan' },
+    { key: 'broken_image_fk',    icon: '🔗', label: '图片外键断裂',   desc: '图片指向不存在的作品',         badge: 'broken' },
+    { key: 'broken_work_fk',     icon: '🔗', label: '作品外键断裂',   desc: '作品指向不存在的作者',         badge: 'broken' },
+    { key: 'page_count_mismatch',icon: '🔢', label: '页数不匹配',     desc: '记录页数与实际图片数不一致',   badge: 'mismatch' },
+    { key: 'empty_directories',  icon: '🗑️', label: '空目录',         desc: '磁盘上作者目录为空（无文件）', badge: 'missing' },
+];
+
+let verifyData = null;  // 缓存验证结果
+let currentCategory = null;  // 当前展开的分类
+
+async function startVerify() {
+    setSyncButtons(true);
+    resetProgress();
+    clearLog();
+    addLog('正在验证数据库完整性（7项检查）...', 'info');
+
+    try {
+        const r = await fetch('/api/verify');
+        const d = await r.json();
+        if (d.success) {
+            verifyData = d.data;
+            renderVerifyResults(verifyData);
+
+            if (verifyData.is_healthy) {
+                addLog('✅ 数据库完全健康，未发现异常!', 'success');
+            } else {
+                const total = verifyData.issues.length;
+                addLog(`⚠️ 发现 ${total} 个异常，请选择要修复的项目`, 'warn');
+            }
+        } else {
+            addLog('验证失败: ' + (d.error || '未知错误'), 'error');
+        }
+    } catch(e) {
+        addLog('请求失败: ' + e.message, 'error');
+    }
+
+    setSyncButtons(false);
+}
+
+function renderVerifyResults(data) {
+    const section = document.getElementById('verifySection');
+    const summaryEl = document.getElementById('verifySummary');
+    const categoriesEl = document.getElementById('verifyCategories');
+    const actionsEl = document.getElementById('verifyActions');
+
+    section.classList.add('active');
+
+    // 顶部概览统计
+    const totalIssues = data.issues.length;
+    let summaryHTML = '';
+    summaryHTML += `<div class="verify-summary-item" onclick="scrollToCategory('all')">
+        <div class="count ${totalIssues > 0 ? 'red' : 'green'}">${totalIssues}</div>
+        <div class="label">异常总数</div>
+    </div>`;
+    summaryHTML += `<div class="verify-summary-item"><div class="count">${data.total_images_db}</div><div class="label">数据库图片</div></div>`;
+    summaryHTML += `<div class="verify-summary-item"><div class="count">${data.total_files_disk}</div><div class="label">磁盘文件</div></div>`;
+    summaryHTML += `<div class="verify-summary-item"><div class="count">${data.total_works_db}</div><div class="label">作品记录</div></div>`;
+    summaryHTML += `<div class="verify-summary-item"><div class="count">${data.total_artists_db}</div><div class="label">作者记录</div></div>`;
+
+    ISSUE_CATEGORIES.forEach(cat => {
+        const arr = data[cat.key] || [];
+        const cls = arr.length > 0 ? 'red' : 'green';
+        summaryHTML += `<div class="verify-summary-item ${arr.length > 0 ? '' : ''}" onclick="scrollToCategory('${cat.key}')">
+            <div class="count ${cls}">${arr.length}</div>
+            <div class="label">${cat.label}</div>
+        </div>`;
+    });
+    summaryEl.innerHTML = summaryHTML;
+
+    // 分类详细列表
+    let catHTML = '';
+    ISSUE_CATEGORIES.forEach(cat => {
+        const arr = data[cat.key] || [];
+        catHTML += `<div class="verify-category ${arr.length > 0 ? 'active' : ''}" id="cat-${cat.key}">
+            <div class="verify-category-header" onclick="toggleCategory('${cat.key}')">
+                <span class="cat-title">${cat.icon} ${cat.label}</span>
+                <span class="cat-count">
+                    <span class="vi-badge ${cat.badge}">${arr.length} 项</span>
+                    ${arr.length > 0 ? '▼' : ''}
+                </span>
+            </div>
+            <div class="verify-category-body" id="body-${cat.key}">
+                ${renderIssueItems(cat.key, arr)}
+            </div>
+        </div>`;
+    });
+    categoriesEl.innerHTML = catHTML;
+
+    // 操作栏
+    if (totalIssues > 0) {
+        actionsEl.style.display = 'flex';
+        updateSelectInfo();
+    } else {
+        actionsEl.style.display = 'none';
+    }
+
+    // 显示/隐藏「一键修复全部页数不匹配」按钮
+    const pageMismatchCount = (data.page_count_mismatch || []).length;
+    const btnFixAll = document.getElementById('btnFixAllPages');
+    if (btnFixAll) {
+        btnFixAll.style.display = pageMismatchCount > 0 ? '' : 'none';
+    }
+}
+
+function renderIssueItems(catKey, items) {
+    if (!items || items.length === 0) {
+        return '<div class="empty-state"><p>无异常</p></div>';
+    }
+
+    return items.map((item, idx) => {
+        const id = `${catKey}_${idx}`;
+        let mainText = '', subText = '';
+
+        switch (catKey) {
+            case 'missing_files':
+                mainText = `📁 ${item.filename || item.file_path}`;
+                subText = `作品ID: ${item.work_id} | 路径: ${item.file_path}`;
+                break;
+            case 'orphan_files':
+                mainText = `📄 ${item.filename}`;
+                subText = `作品ID: ${item.work_id} | 第${item.page}页 | 路径: ${item.file_path}`;
+                break;
+            case 'orphan_works':
+                mainText = `📋 作品 #${item.id} - ${item.title || '(无标题)'}`;
+                subText = `作者: ${item.artist_name || item.artist_id || '未知'} | 记录页数: ${item.page_count || 0}`;
+                break;
+            case 'orphan_artists':
+                mainText = `👤 作者 #${item.id} - ${item.name || '(无名)'}`;
+                subText = `账号: ${item.account || '未知'}`;
+                break;
+            case 'broken_image_fk':
+                mainText = `🔗 图片 #${item.id} - ${item.filename || '(无)'}`;
+                subText = `指向不存在作品: work_id=${item.work_id} | 路径: ${item.file_path || ''}`;
+                break;
+            case 'broken_work_fk':
+                mainText = `🔗 作品 #${item.id} - ${item.title || '(无标题)'}`;
+                subText = `指向不存在作者: artist_id=${item.artist_id}`;
+                break;
+            case 'page_count_mismatch':
+                mainText = `🔢 作品 #${item.work_id} - ${item.title || '(无标题)'}`;
+                subText = `记录 ${item.expected_pages} 页 → 实际 ${item.actual_pages} 页 | 作者: ${item.artist_name || ''}`;
+                break;
+            case 'empty_directories':
+                mainText = `🗑️ ${item.dir_name}`;
+                subText = `路径: ${item.dir_path}` + (item.user_id ? ` | 作者ID: ${item.user_id}` : ' | ⚠️ 命名不规范，将跳过数据库清理');
+                break;
+        }
+
+        return `<label class="verify-item">
+            <input type="checkbox" class="issue-check" data-cat="${catKey}" data-idx="${idx}" onchange="updateSelectInfo()">
+            <span class="vi-info">
+                <div class="vi-main">${mainText}</div>
+                <div class="vi-sub">${subText}</div>
+            </span>
+        </label>`;
+    }).join('');
+}
+
+function toggleCategory(catKey) {
+    const body = document.getElementById('body-' + catKey);
+    if (body.style.display === 'none') {
+        body.style.display = 'block';
+        currentCategory = catKey;
+    } else {
+        body.style.display = 'none';
+    }
+}
+
+function scrollToCategory(catKey) {
+    if (catKey === 'all') return;
+    const el = document.getElementById('cat-' + catKey);
+    if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // 确保展开
+        const body = document.getElementById('body-' + catKey);
+        if (body) body.style.display = 'block';
+        currentCategory = catKey;
+    }
+}
+
+function getSelectedIssues() {
+    const checks = document.querySelectorAll('.issue-check:checked');
+    const selected = {};
+    checks.forEach(cb => {
+        const cat = cb.dataset.cat;
+        const idx = parseInt(cb.dataset.idx);
+        if (!selected[cat]) selected[cat] = [];
+        selected[cat].push(idx);
+    });
+    return selected;
+}
+
+function updateSelectInfo() {
+    const checks = document.querySelectorAll('.issue-check:checked');
+    document.getElementById('selectInfo').textContent = `已选择 ${checks.length} 项`;
+    document.getElementById('btnFix').disabled = checks.length === 0;
+}
+
+function selectAllIssues() {
+    let scope = '.issue-check';
+    if (currentCategory) {
+        scope = `#body-${currentCategory} .issue-check`;
+    }
+    document.querySelectorAll(scope).forEach(cb => { cb.checked = true; });
+    updateSelectInfo();
+}
+
+function deselectAllIssues() {
+    let scope = '.issue-check';
+    if (currentCategory) {
+        scope = `#body-${currentCategory} .issue-check`;
+    }
+    document.querySelectorAll(scope).forEach(cb => { cb.checked = false; });
+    updateSelectInfo();
+}
+
+/**
+ * 一键修复全部页数不匹配
+ * 1. 调用后端修复所有 works.page_count → 实际 images 数量
+ * 2. 对于 expected > actual 的作品，自动排队增量下载
+ */
+async function fixAllPageCounts() {
+    const pageMismatchCount = (verifyData.page_count_mismatch || []).length;
+    if (pageMismatchCount === 0) {
+        addLog('没有页数不匹配的项目', 'info');
+        return;
+    }
+
+    if (!confirm(`将修复全部 ${pageMismatchCount} 个页数不匹配。\n\n修复后，对缺失页面的作品将自动排队增量下载。\n\n是否继续？`)) {
+        return;
+    }
+
+    document.getElementById('btnFixAllPages').disabled = true;
+    document.getElementById('btnFix').disabled = true;
+    document.getElementById('btnVerify').disabled = true;
+    addLog(`🔢 正在一键修复 ${pageMismatchCount} 个页数不匹配...`, 'info');
+
+    try {
+        const r = await fetch('/api/verify/fix-all-page-counts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const d = await r.json();
+        if (d.success) {
+            addLog('✅ ' + d.message, 'success');
+            const needDownload = d.data.need_download || [];
+
+            if (needDownload.length > 0) {
+                addLog(`📥 有 ${needDownload.length} 个作品缺失页面，正在排队增量下载...`, 'warn');
+
+                // 逐个排队下载（通过 SSE 监听进度）
+                for (const item of needDownload) {
+                    addLog(`  ⏳ 作品 ${item.work_id} "${item.title || '(无标题)'}" 缺失 ${item.missing_pages} 页，开始补充下载...`, 'info');
+                    try {
+                        const taskResp = await fetch('/api/tasks', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                task_type: 'work',
+                                params: { work_id: String(item.work_id), force: false }
+                            })
+                        });
+                        const taskData = await taskResp.json();
+                        if (taskData.success) {
+                            // 等待任务完成
+                            await watchTask(taskData.task_id);
+                            addLog(`  ✅ 作品 ${item.work_id} 补充下载完成`, 'success');
+                        } else {
+                            addLog(`  ❌ 作品 ${item.work_id} 排队失败: ${taskData.error}`, 'error');
+                        }
+                    } catch(e) {
+                        addLog(`  ❌ 作品 ${item.work_id} 下载异常: ${e.message}`, 'error');
+                    }
+                }
+                addLog(`📥 增量下载全部完成`, 'success');
+            }
+
+            // 自动重新验证
+            addLog('修复完成，正在重新验证...', 'info');
+            setTimeout(() => startVerify(), 500);
+        } else {
+            addLog('❌ 修复失败: ' + (d.error || '未知错误'), 'error');
+        }
+    } catch(e) {
+        addLog('❌ 请求失败: ' + e.message, 'error');
+    }
+
+    document.getElementById('btnFixAllPages').disabled = false;
+    document.getElementById('btnFix').disabled = false;
+    document.getElementById('btnVerify').disabled = false;
+}
+
+async function executeFix() {
+    const selected = getSelectedIssues();
+    const totalSelected = Object.values(selected).reduce((sum, arr) => sum + arr.length, 0);
+
+    if (totalSelected === 0) {
+        addLog('⚠️ 请先选择要修复的项目', 'warn');
+        return;
+    }
+
+    const hasEmptyDirs = selected.empty_directories && selected.empty_directories.length > 0;
+    const hasOrphanFiles = selected.orphan_files && selected.orphan_files.length > 0;
+    const hasBrokenFk = selected.broken_image_fk && selected.broken_image_fk.length > 0;
+    let confirmMsg = `确认执行修复？将处理 ${totalSelected} 项异常。`;
+    const warnings = [];
+    if (hasEmptyDirs) {
+        warnings.push(`⚠️ 包含 ${selected.empty_directories.length} 个空目录，将永久删除磁盘上的文件夹！`);
+    }
+    if (hasOrphanFiles) {
+        warnings.push(`ℹ️ 孤儿文件修复会自动补全作品和作者记录，避免产生外键断裂。`);
+    }
+    if (hasBrokenFk) {
+        warnings.push(`ℹ️ 图片外键断裂将尝试补全作品和作者关联，而非直接删除。`);
+    }
+    if (warnings.length > 0) {
+        confirmMsg += '\n\n' + warnings.join('\n');
+    } else {
+        confirmMsg += `\n\n注意：仅清理数据库记录，不会删除磁盘文件。`;
+    }
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+
+    document.getElementById('btnFix').disabled = true;
+    document.getElementById('btnVerify').disabled = true;
+    addLog(`🔧 开始执行修复，共 ${totalSelected} 项...`, 'info');
+
+    // 构建修复请求
+    const actions = {};
+
+    // 1. 缺失文件 - 删除images记录
+    if (selected.missing_files) {
+        actions.delete_missing_file_ids = selected.missing_files.map(
+            idx => verifyData.missing_files[idx].id
+        );
+    }
+
+    // 2. 孤儿文件 - 重新扫描入库（自动补全作品和作者）
+    if (selected.orphan_files) {
+        actions.reimport_orphan_files = selected.orphan_files.map(
+            idx => verifyData.orphan_files[idx]
+        );
+    }
+
+    // 3. 孤儿作品 - 删除works记录
+    if (selected.orphan_works) {
+        actions.delete_orphan_work_ids = selected.orphan_works.map(
+            idx => verifyData.orphan_works[idx].id
+        );
+    }
+
+    // 4. 孤儿作者 - 删除artists记录
+    if (selected.orphan_artists) {
+        actions.delete_orphan_artist_ids = selected.orphan_artists.map(
+            idx => verifyData.orphan_artists[idx].id
+        );
+    }
+
+    // 5. 图片外键断裂 - 补全works+artists关联
+    if (selected.broken_image_fk) {
+        actions.delete_broken_image_fk_ids = selected.broken_image_fk.map(
+            idx => verifyData.broken_image_fk[idx].id
+        );
+    }
+
+    // 6. 作品外键断裂 - 删除works记录
+    if (selected.broken_work_fk) {
+        actions.delete_broken_work_fk_ids = selected.broken_work_fk.map(
+            idx => verifyData.broken_work_fk[idx].id
+        );
+    }
+
+    // 7. 页数不匹配 - 修正page_count
+    if (selected.page_count_mismatch) {
+        actions.fix_page_counts = selected.page_count_mismatch.map(
+            idx => ({
+                work_id: verifyData.page_count_mismatch[idx].work_id,
+                actual_pages: verifyData.page_count_mismatch[idx].actual_pages
+            })
+        );
+    }
+
+    // 8. 空目录 - 清除磁盘空文件夹 + 清理孤儿作者
+    if (selected.empty_directories) {
+        actions.remove_empty_dirs = selected.empty_directories.map(
+            idx => verifyData.empty_directories[idx]
+        );
+    }
+
+    try {
+        const r = await fetch('/api/verify/fix', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ actions })
+        });
+        const d = await r.json();
+        if (d.success) {
+            addLog('✅ ' + d.message, 'success');
+            if (d.data) {
+                for (const [k, v] of Object.entries(d.data)) {
+                    if (v > 0) addLog(`  ${k}: ${v} 项`, 'success');
+                }
+            }
+            addLog('修复完成，正在重新验证...', 'info');
+            // 自动重新验证
+            setTimeout(() => startVerify(), 500);
+        } else {
+            addLog('❌ 修复失败: ' + (d.error || '未知错误'), 'error');
+        }
+    } catch(e) {
+        addLog('❌ 请求失败: ' + e.message, 'error');
+    }
+
+    document.getElementById('btnFix').disabled = false;
+    document.getElementById('btnVerify').disabled = false;
+}
+
+// ====== 同步历史 ======
+async function loadSyncHistory() {
+    const list = document.getElementById('syncHistoryList');
+    const count = document.getElementById('historyCount');
+    try {
+        const r = await fetch('/api/sync/history');
+        const d = await r.json();
+        const records = (d.success && d.data) ? d.data : [];
+        count.textContent = records.length > 0 ? `最近 ${records.length} 次` : '';
+        if (records.length === 0) {
+            list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">暂无同步记录，点击上方按钮开始第一次扫描</div>';
+            return;
+        }
+        const typeLabel = { 'incremental_scan': '⚡ 增量扫描', 'full_scan': '📂 全量扫描' };
+        list.innerHTML = records.slice(0, 15).map(rec => {
+            const label = typeLabel[rec.sync_type] || rec.sync_type;
+            const parts = [];
+            if (rec.items_added > 0) parts.push(`新增 <b style="color:var(--green)">${rec.items_added}</b> 条`);
+            else if (rec.items_found > 0) parts.push(`共 ${rec.items_found} 个文件(无新增)`);
+            else parts.push('无文件变化');
+            if (rec.items_updated > 0) parts.push(`更新 ${rec.items_updated}`);
+            const time = (rec.created_at || '').replace('T', ' ').substring(0, 19);
+            return `<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 10px;border-radius:6px;background:var(--bg-input);margin-bottom:6px;font-size:12px;">
+                <span style="color:var(--text-secondary);">${label} · ${parts.join(' · ')}</span>
+                <span style="color:var(--text-muted);flex-shrink:0;">${time}</span>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">同步历史加载失败</div>';
+    }
+}
+
+// ====== 页面初始化 ======
+async function init() {
+    // 加载配置信息
+    try {
+        const r = await fetch('/api/config');
+        const d = await r.json();
+        if (d.success && d.data) {
+            document.getElementById('scanDir').textContent = d.data.download_path || '-';
+        }
+    } catch(e) {}
+
+    // 加载同步历史
+    loadSyncHistory();
+
+    // 检查是否有活跃任务
+    try {
+        const r = await fetch('/api/tasks/active');
+        const d = await r.json();
+        if (d.success && d.data.length > 0) {
+            // 只恢复本页的扫描任务，避免把别的下载任务显示成"扫描同步"
+            const runningTask = d.data.find(t => t.task_type === 'sync'
+                && (t.status === 'running' || t.status === 'paused'));
+            if (runningTask) {
+                document.getElementById('progressSection').classList.add('active');
+                setSyncButtons(true);
+                connectSSE(runningTask.task_id, '扫描同步');
+            }
+        }
+    } catch(e) {}
+}
+
+init();
+</script>
+</body>
+</html>

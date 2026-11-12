@@ -1,0 +1,29 @@
+<!-- 侧边栏（公共片段，使用前设置 active_nav 变量） -->
+<div class="sidebar">
+    <div class="sidebar-logo">
+        <span class="logo-icon">🎨</span> Pixiv DL
+    </div>
+    <a href="/" class="nav-item{% if active_nav == 'index' %} active{% endif %}">
+        <span class="nav-icon">📊</span> 仪表盘
+    </a>
+    <a href="/images" class="nav-item{% if active_nav == 'images' %} active{% endif %}">
+        <span class="nav-icon">🖼️</span> 图片浏览
+    </a>
+    <a href="/artists" class="nav-item{% if active_nav == 'artists' %} active{% endif %}">
+        <span class="nav-icon">👤</span> 作者列表
+    </a>
+    <a href="/download" class="nav-item{% if active_nav == 'download' %} active{% endif %}">
+        <span class="nav-icon">⬇️</span> 下载管理
+    </a>
+    <a href="/bookmarks" class="nav-item{% if active_nav == 'bookmarks' %} active{% endif %}">
+        <span class="nav-icon">⭐</span> 收藏作品
+    </a>
+    <a href="/sync" class="nav-item{% if active_nav == 'sync' %} active{% endif %}">
+        <span class="nav-icon">🔄</span> 本地同步
+    </a>
+    <a href="/config" class="nav-item{% if active_nav == 'config' %} active{% endif %}">
+        <span class="nav-icon">⚙️</span> 系统配置
+    </a>
+    <div class="nav-spacer"></div>
+    <div class="nav-footer" id="navFooter">加载中...</div>
+</div>

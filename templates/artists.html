@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixiv Downloader - 作者列表</title>
+<link rel="stylesheet" href="/static/base.css">
+<style>body { overflow: hidden; }
+
+/* ====== 整体布局容器 ====== */
+.layout-container {
+  margin-left: 230px;
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ====== 左侧：作者列表 ====== */
+.left-panel {
+  flex: 0 0 420px;
+  width: 420px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+.left-panel-header {
+  padding: 20px 24px 16px;
+  flex-shrink: 0;
+}
+.left-panel-header h1 {
+  font-size: 22px; font-weight: 800;
+  letter-spacing: -0.5px;
+  margin-bottom: 14px;
+}
+.search-bar {
+  display: flex; gap: 10px; align-items: center;
+}
+.search-input {
+  flex: 1;
+  padding: 9px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary); font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--text-muted); }
+.search-hint {
+  font-size: 11px; color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* 排序筛选工具栏 */
+.filter-bar {
+  display: flex; gap: 8px; align-items: center;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.filter-select {
+  padding: 5px 10px;
+  font-size: 11px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+.filter-select:focus { border-color: var(--accent); }
+.filter-checkbox {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--text-secondary);
+  cursor: pointer; white-space: nowrap;
+  user-select: none;
+}
+.filter-checkbox input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.tag-filter-container {
+  flex: 1; min-width: 100px;
+}
+.tag-filter-container .filter-select {
+  width: 100%;
+}
+
+/* 作者列表滚动区 */
+.artist-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 24px 20px;
+}
+.artist-list-scroll::-webkit-scrollbar { width: 4px; }
+.artist-list-scroll::-webkit-scrollbar-track { background: transparent; }
+.artist-list-scroll::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+
+/* ====== 作者卡片（紧凑列表样式） ====== */
+.artist-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; margin-bottom: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.artist-card:hover {
+  border-color: var(--border-light);
+  background: var(--bg-card-hover);
+}
+.artist-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+.artist-card-avatar {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent-dim), var(--purple-dim));
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 15px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.artist-card-info {
+  flex: 1; min-width: 0;
+}
+.artist-card-name {
+  font-size: 14px; font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.artist-card-meta {
+  font-size: 11px; color: var(--text-muted);
+  margin-top: 2px;
+  display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap;
+}
+.artist-bookmark-tag {
+  color: var(--orange); font-weight: 600;
+  font-size: 11px;
+}
+.artist-card-actions {
+  display: flex; gap: 4px; flex-shrink: 0;
+}
+
+/* 通用小按钮 */
+.btn-sm {
+  padding: 4px 10px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: 6px;
+  cursor: pointer; transition: all var(--transition);
+  background: var(--bg-input); color: var(--text-secondary);
+  white-space: nowrap;
+}
+.btn-sm:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+.btn-sm.accent { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.btn-sm.accent:hover { background: rgba(50,145,230,0.2); }
+.btn-sm.accent:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-sm.accent.updating {
+  border-color: var(--orange); color: var(--orange);
+  background: var(--orange-dim);
+}
+
+/* ====== 右侧：作品预览面板 ====== */
+.right-panel {
+  flex: 1;
+  display: flex; flex-direction: column;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+.right-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg-primary);
+}
+.right-panel-header h2 {
+  font-size: 16px; font-weight: 700;
+  display: flex; align-items: center; gap: 10px;
+}
+.right-panel-header-actions {
+  display: flex; align-items: center; gap: 8px;
+}
+.panel-close-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--text-secondary); font-size: 16px;
+  width: 30px; height: 30px; border-radius: 8px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition);
+}
+.panel-close-btn:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+
+/* 作品网格滚动区 */
+.works-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+}
+.works-scroll::-webkit-scrollbar { width: 4px; }
+.works-scroll::-webkit-scrollbar-track { background: transparent; }
+.works-scroll::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+
+.works-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.work-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  transition: all var(--transition);
+}
+.work-card:hover { border-color: var(--border-light); }
+.work-card-thumb {
+  width: 100%; aspect-ratio: 3/4;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-primary);
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+.work-card-thumb img {
+  width: 100%; height: 100%; object-fit: cover;
+  opacity: 0; transition: opacity 0.3s ease;
+}
+.work-card-thumb img.loaded { opacity: 1; }
+/* 骨架屏占位 */
+.work-card-skeleton {
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, var(--bg-primary) 25%, var(--bg-card) 50%, var(--bg-primary) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.work-card-thumb .no-img {
+  font-size: 32px; color: var(--text-muted); opacity: 0.3;
+}
+.work-card-body { padding: 8px 10px; }
+.work-card-title {
+  font-size: 12px; font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+.work-card-meta {
+  font-size: 11px; color: var(--text-muted);
+  display: flex; justify-content: space-between;
+  align-items: center;
+}
+.work-dl-badge {
+  font-size: 10px; padding: 2px 6px; border-radius: 4px;
+  font-weight: 600;
+}
+.work-dl-badge.done { background: var(--green-dim); color: var(--green); }
+.work-dl-badge.miss { background: var(--orange-dim); color: var(--orange); }
+
+/* ====== 右侧空状态 ====== */
+.right-panel-placeholder {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted);
+}
+.right-panel-placeholder .placeholder-content {
+  text-align: center;
+}
+.right-panel-placeholder .placeholder-icon {
+  font-size: 48px; margin-bottom: 12px; opacity: 0.4;
+}
+.right-panel-placeholder p { font-size: 14px; }
+
+/* ====== 增量更新进度条 ====== */
+.update-progress {
+  display: none;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  flex-shrink: 0;
+}
+.update-progress.active { display: block; }
+.update-progress-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.update-progress-title {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+}
+.update-progress-text {
+  font-size: 11px; color: var(--text-muted);
+}
+.progress-bar-track {
+  height: 6px; background: var(--bg-input);
+  border-radius: 3px; overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple));
+  border-radius: 3px; transition: width 0.3s ease;
+  width: 0%;
+}
+
+/* ====== 加载/空状态 ====== */
+.empty-state { text-align: center; padding: 30px 20px; color: var(--text-muted); }
+.empty-state .icon { font-size: 36px; margin-bottom: 8px; opacity: 0.5; }
+.empty-state p { font-size: 13px; }
+.loading-state { text-align: center; padding: 30px 20px; color: var(--text-muted); }
+.spinner {
+  width: 24px; height: 24px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto 10px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.error-msg { color: var(--red); text-align: center; padding: 20px; }
+
+/* ====== 作品卡片页码指示器 ====== */
+.work-card-page-indicator {
+  position: absolute; top: 6px; right: 6px;
+  background: rgba(0,0,0,0.7); color: #fff;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 4px;
+  z-index: 2; letter-spacing: 0.5px;
+}
+.work-card.clickable { cursor: pointer; }
+
+/* ====== 右侧详情面板（与收藏页一致） ====== */
+.detail-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 200; display: none; opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.detail-overlay.active { display: block; opacity: 1; }
+
+.detail-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 460px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+  z-index: 210; display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.detail-panel.active { transform: translateX(0); }
+
+.detail-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.detail-header h2 {
+  font-size: 16px; font-weight: 700;
+  max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.detail-close {
+  background: none; border: 1px solid var(--border);
+  color: var(--text-secondary); font-size: 16px;
+  width: 30px; height: 30px; border-radius: 8px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition);
+}
+.detail-close:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+
+.detail-scroll {
+  flex: 1; overflow-y: auto; padding: 16px 24px;
+}
+.detail-scroll::-webkit-scrollbar { width: 4px; }
+.detail-scroll::-webkit-scrollbar-track { background: transparent; }
+.detail-scroll::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+
+.detail-section { margin-bottom: 16px; }
+.detail-section-title {
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+}
+.detail-tags {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.detail-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  font-size: 11px; font-weight: 500;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  transition: all var(--transition);
+}
+.detail-tag:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.detail-info-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; font-size: 13px;
+}
+.detail-info-label { color: var(--text-muted); }
+.detail-info-value { color: var(--text-primary); font-weight: 500; }
+.detail-link {
+  color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 500;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 0;
+}
+.detail-link:hover { text-decoration: underline; }
+.detail-artist-link {
+  color: var(--accent); text-decoration: none;
+  transition: opacity var(--transition);
+}
+.detail-artist-link:hover {
+  opacity: 0.75; text-decoration: underline;
+}
+.detail-desc {
+  font-size: 12px; color: var(--text-secondary); line-height: 1.5;
+  white-space: pre-wrap; word-break: break-all;
+  max-height: 120px; overflow-y: auto;
+}
+
+/* 面板内图片网格 */
+.detail-img-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.detail-img-item {
+  aspect-ratio: 3/4;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  overflow: hidden; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  transition: all var(--transition);
+}
+.detail-img-item:hover { border-color: var(--accent); }
+.detail-img-item img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.detail-img-item .detail-img-placeholder {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; color: var(--text-muted); opacity: 0.3;
+}
+.detail-img-badge {
+  position: absolute; bottom: 4px; right: 4px;
+  font-size: 9px; font-weight: 700; padding: 2px 5px;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.6); color: #fff;
+}
+
+/* ====== 多P图片查看器模态窗 ====== */
+.art-image-viewer-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+  z-index: 300; display: none; align-items: center; justify-content: center; flex-direction: column;
+}
+.art-image-viewer-overlay.active { display: flex; }
+.art-viewer-main { position: relative; display: flex; align-items: center; justify-content: center; flex: 1; width: 100%; overflow: hidden; padding: 0 60px; }
+.art-viewer-main img { max-width: 100%; max-height: 85vh; object-fit: contain; border-radius: 4px; box-shadow: 0 4px 40px rgba(0,0,0,0.6); }
+.art-viewer-nav {
+  position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #fff; font-size: 22px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all var(--transition); z-index: 10;
+}
+.art-viewer-nav:hover { background: rgba(255,255,255,0.2); }
+.art-viewer-nav.prev { left: 10px; }
+.art-viewer-nav.next { right: 10px; }
+.art-viewer-nav:disabled { opacity: 0.3; cursor: not-allowed; }
+.art-viewer-topbar { position: absolute; top: 0; left: 0; right: 0; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 10; }
+.art-viewer-title { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9); max-width: 600px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.art-viewer-page { font-size: 14px; color: rgba(255,255,255,0.7); font-weight: 600; }
+.art-viewer-close {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #fff; font-size: 18px; width: 36px; height: 36px; border-radius: 50%;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--transition);
+}
+.art-viewer-close:hover { background: rgba(255,255,255,0.25); }
+.art-viewer-copy {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #fff; font-size: 16px; width: 36px; height: 36px; border-radius: 50%;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--transition);
+  margin-left: 8px; margin-right: 8px;
+}
+.art-viewer-copy:hover { background: rgba(255,255,255,0.25); }
+.art-viewer-copy.copied { background: rgba(76,175,80,0.5); border-color: rgba(76,175,80,0.7); }
+.art-viewer-pixiv-link {
+  font-size: 12px; font-weight: 600; color: var(--accent);
+  background: rgba(50,145,230,0.2); border: 1px solid rgba(50,145,230,0.4);
+  padding: 5px 12px; border-radius: 6px; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px;
+  transition: all 0.2s; margin-left: auto;
+}
+.art-viewer-pixiv-link:hover { background: rgba(50,145,230,0.35); color: #5aa9f0; }
+.art-viewer-thumbnails { display: flex; align-items: center; gap: 6px; padding: 12px 24px; overflow-x: auto; max-width: 100%; flex-shrink: 0; }
+.art-viewer-thumbnails::-webkit-scrollbar { height: 3px; }
+.art-viewer-thumbnails::-webkit-scrollbar-track { background: transparent; }
+.art-viewer-thumbnails::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+.art-viewer-thumb {
+  width: 56px; height: 56px; border-radius: 6px; overflow: hidden; flex-shrink: 0; cursor: pointer;
+  border: 2px solid transparent; opacity: 0.5; transition: all var(--transition); background: rgba(255,255,255,0.05);
+}
+.art-viewer-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.art-viewer-thumb:hover { opacity: 0.8; border-color: rgba(255,255,255,0.3); }
+.art-viewer-thumb.active { opacity: 1; border-color: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+
+/* ====== 移动端适配 ====== */
+@media (max-width: 768px) {
+  body { overflow-x: hidden; overflow-y: auto; }
+  .sidebar { display: none; }
+  .layout-container {
+    margin-left: 0;
+    height: auto;
+    flex-direction: column;
+    overflow: visible;
+  }
+  .left-panel {
+    flex: none;
+    width: 100%;
+    border-right: none;
+    max-height: none;
+  }
+  .left-panel-header { padding: 12px 12px 8px; }
+  .left-panel-header h1 { font-size: 18px; margin-bottom: 8px; }
+  .search-input { padding: 7px 10px; font-size: 12px; }
+
+  /* 作品面板改为全屏浮层：点击作者后展示，关闭按钮返回列表 */
+  .right-panel {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 56px;
+    z-index: 260; padding: 12px; overflow-y: auto;
+    background: var(--bg-primary);
+    display: none;
+  }
+  .right-panel.mobile-open { display: flex; }
+  .right-panel-header { padding: 8px 4px 12px; }
+  .right-panel-header h2 { font-size: 15px; }
+  .right-panel-header-actions { gap: 6px; }
+  .right-panel-header-actions .btn-sm { font-size: 11px; padding: 6px 10px; }
+  .works-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+  /* 详情面板占满屏 */
+  .art-detail-panel { width: 100%; right: -100%; }
+  .art-detail-img-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+  /* 图片查看器 */
+  .art-viewer-main { padding: 0 40px; }
+  .art-viewer-nav { width: 36px; height: 36px; font-size: 18px; }
+  .art-viewer-nav.prev { left: 4px; }
+  .art-viewer-nav.next { right: 4px; }
+  .art-viewer-topbar { padding: 10px 14px; }
+  .art-viewer-title { font-size: 12px; max-width: 200px; }
+  .art-viewer-pixiv-link { font-size: 10px; padding: 3px 8px; }
+  .art-viewer-copy { width: 30px; height: 30px; font-size: 14px; margin-left: 4px; margin-right: 4px; }
+  .art-viewer-close { width: 30px; height: 30px; font-size: 14px; }
+  .art-viewer-thumbnails { padding: 8px 12px; gap: 4px; }
+  .art-viewer-thumb { width: 40px; height: 40px; }
+}
+@media (max-width: 768px) {
+  .mobile-tab-bar { display: flex; }
+  /* 触屏无 hover，作品删除按钮常显 */
+  .work-del-btn { opacity: 1; }
+}
+
+/* ====== 删除按钮（作品卡 hover 显示） ====== */
+.work-card-thumb { position: relative; }
+.work-del-btn {
+  position: absolute; top: 6px; right: 6px; z-index: 3;
+  width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.65); border: none; cursor: pointer;
+  font-size: 13px; color: #fff; opacity: 0; transition: opacity var(--transition);
+}
+.work-card:hover .work-del-btn { opacity: 1; }
+.work-del-btn:hover { background: var(--red); }
+.btn-delete-danger {
+  background: var(--red-dim); color: var(--red);
+  border: 1px solid rgba(240,67,81,0.4);
+  margin-right: 8px;
+}
+.btn-delete-danger:hover { background: var(--red); color: #fff; }
+</style>
+<script src="/static/common.js"></script>
+</head>
+<body>
+
+<!-- 底部 Tab 导航栏（仅手机端显示） -->
+{% set active_tab = 'artists' %}
+{% include '_mobile_nav.html' %}
+
+{% set active_nav = 'artists' %}
+{% include '_sidebar.html' %}
+
+<div class="layout-container">
+    <!-- ====== 左侧：作者列表 ====== -->
+    <div class="left-panel">
+        <div class="left-panel-header">
+            <h1>👤 作者列表</h1>
+            <div class="search-bar">
+                <input type="text" class="search-input" id="searchInput" placeholder="搜索作者名称或 ID..." oninput="filterArtists()">
+                <span class="search-hint" id="searchHint"></span>
+            </div>
+            <div class="filter-bar">
+                <select class="filter-select" id="sortBy" onchange="filterArtists()">
+                    <option value="default">默认排序</option>
+                    <option value="name">按名称排序</option>
+                    <option value="work_count_desc">作品数 ↓</option>
+                    <option value="work_count_asc">作品数 ↑</option>
+                    <option value="bookmark_count_desc">收藏数 ↓</option>
+                    <option value="bookmark_count_asc">收藏数 ↑</option>
+                    <option value="tag_count_desc">标签数 ↓</option>
+                    <option value="tag_count_asc">标签数 ↑</option>
+                    <option value="created_desc">创建时间 ↓</option>
+                    <option value="created_asc">创建时间 ↑</option>
+                </select>
+                <label class="filter-checkbox" title="仅显示有收藏作品的作者">
+                    <input type="checkbox" id="filterBookmarked" onchange="filterArtists()"> 仅收藏
+                </label>
+                <div class="tag-filter-container" id="tagFilterContainer" style="display:none;">
+                    <select class="filter-select" id="tagFilter" onchange="filterArtists()">
+                        <option value="">全部标签</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="artist-list-scroll" id="artistListScroll">
+            <div class="loading-state"><div class="spinner"></div>加载作者列表中...</div>
+        </div>
+    </div>
+
+    <!-- ====== 右侧：作品预览 ====== -->
+    <div class="right-panel" id="rightPanel">
+        <div class="right-panel-placeholder" id="rightPlaceholder">
+            <div class="placeholder-content">
+                <div class="placeholder-icon">👈</div>
+                <p>点击左侧作者查看作品</p>
+            </div>
+        </div>
+        <div class="right-panel-header" id="rightHeader" style="display:none">
+            <h2 id="worksPanelTitle">📂 作品列表</h2>
+            <div class="right-panel-header-actions">
+                <button class="btn-sm btn-delete-danger" id="btnDeleteArtist" onclick="deleteArtist()" title="删除该作者及其全部作品（含磁盘文件，不可恢复）">🗑 删除作者</button>
+                <button class="btn-sm accent" id="btnUpdateArtist" onclick="startIncrementalUpdate()" title="增量更新该作者新作品">🔄 增量更新</button>
+                <button class="panel-close-btn" onclick="closeWorksPanel()" title="关闭">✕</button>
+            </div>
+        </div>
+        <div class="update-progress" id="updateProgress">
+            <div class="update-progress-header">
+                <span class="update-progress-title" id="updateProgressTitle">🔄 增量更新中...</span>
+                <span class="update-progress-text" id="updateProgressText">准备中</span>
+            </div>
+            <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="updateProgressBar"></div>
+            </div>
+        </div>
+        <div class="works-scroll" id="worksScroll" style="display:none">
+            <div class="works-grid" id="worksGrid">
+                <div class="loading-state"><div class="spinner"></div>加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ====== 右侧详情面板（与收藏页一致） ====== -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detailPanel">
+    <div class="detail-header">
+        <h2 id="detailTitle">作品详情</h2>
+        <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="detail-scroll" id="detailScroll">
+        <div class="loading-state"><div class="spinner"></div>加载中...</div>
+    </div>
+</div>
+
+<!-- ====== 多P图片查看器模态窗 ====== -->
+<div class="art-image-viewer-overlay" id="artImageViewerOverlay">
+    <div class="art-viewer-topbar">
+        <span class="art-viewer-title" id="artViewerTitle">作品标题</span>
+        <span class="art-viewer-page" id="artViewerPageInfo">1 / 1</span>
+        <a class="art-viewer-pixiv-link" id="artViewerPixivLink" href="#" target="_blank" rel="noopener" title="在 Pixiv 查看此作品">🔗 P站</a>
+        <button class="art-viewer-copy" id="artViewerCopyBtn" onclick="copyArtViewerImage()" title="复制当前图片到剪贴板">📋</button>
+        <button class="art-viewer-copy" id="artViewerCopyFileBtn" onclick="copyArtViewerImageFile()" title="复制文件本体（仅本地访问）" style="display:none;">📁</button>
+        <button class="art-viewer-close" onclick="closeArtImageViewer()">✕</button>
+    </div>
+    <div class="art-viewer-main">
+        <button class="art-viewer-nav prev" id="artViewerPrevBtn" onclick="artViewerPrev()">‹</button>
+        <img id="artViewerImage" src="" alt="">
+        <button class="art-viewer-nav next" id="artViewerNextBtn" onclick="artViewerNext()">›</button>
+    </div>
+    <div class="art-viewer-thumbnails" id="artViewerThumbnails"></div>
+</div>
+
+<script>
+let allArtists = [];
+let currentArtistId = null;
+let currentArtistName = '';
+let updateTaskId = null;
+let updateEventSource = null;
+
+// 性能优化：AbortController 用于取消切换作者时的未完成请求
+let worksAbortController = null;
+// Intersection Observer 用于 DOM 分批渲染
+let worksObserver = null;
+// Intersection Observer 用于逐张图片懒加载
+let imageObserver = null;
+// 存储待渲染的作品数据
+let pendingWorks = [];
+let renderBatchSize = 30; // 每批渲染 30 个卡片
+let renderedCount = 0;
+
+// 收藏标记：当前作者作品中被收藏的ID集合
+let bookmarkedWorkIds = new Set();
+
+function formatDate(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+async function loadArtists() {
+    try {
+        const resp = await fetch('/api/artists');
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error);
+
+        allArtists = data.data || [];
+        renderArtists(allArtists);
+        
+        // 加载标签列表用于筛选
+        loadTagFilter();
+    } catch(e) {
+        document.getElementById('artistListScroll').innerHTML = `<div class="error-msg">加载失败: ${e.message}</div>`;
+    }
+}
+
+let allTags = [];
+let allTagArtistMap = {}; // tag -> Set of artist ids
+
+async function loadTagFilter() {
+    try {
+        const resp = await fetch('/api/tags');
+        const data = await resp.json();
+        if (!data.success) return;
+        allTags = data.data || [];
+        
+        // 构建 tag -> artist_ids 的映射
+        allTagArtistMap = {};
+        // 需要获取每个 tag 对应的作者列表
+        for (const t of allTags.slice(0, 30)) { // 只加载前30个热门标签
+            try {
+                const ar = await fetch('/api/tags/artists?tag=' + encodeURIComponent(t.tag));
+                const ad = await ar.json();
+                if (ad.success && ad.data) {
+                    allTagArtistMap[t.tag] = new Set(ad.data.map(a => a.id));
+                }
+            } catch(e) {}
+        }
+        
+        // 填充标签筛选下拉框
+        const sel = document.getElementById('tagFilter');
+        const container = document.getElementById('tagFilterContainer');
+        if (allTags.length > 0) {
+            container.style.display = 'block';
+            sel.innerHTML = '<option value="">全部标签</option>' + 
+                allTags.map(t => `<option value="${t.tag.replace(/"/g, '&quot;')}">🏷️ ${t.tag} (${t.work_count})</option>`).join('');
+        }
+    } catch(e) {
+        console.error('加载标签列表失败:', e);
+    }
+}
+
+function renderArtists(artists) {
+    const container = document.getElementById('artistListScroll');
+    document.getElementById('searchHint').textContent =
+        artists.length !== allArtists.length ? `显示 ${artists.length} / ${allArtists.length} 位作者` : '';
+
+    if (artists.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>没有匹配的作者</p>'
+            + '<button class="btn-sm accent" style="margin-top:14px;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;background:var(--accent);color:#fff;font-size:12px;" onclick="clearArtistFilters()">✕ 清除筛选</button></div>';
+        return;
+    }
+
+    container.innerHTML = artists.map(a => `
+        <div class="artist-card ${a.id === currentArtistId ? 'selected' : ''}" onclick="selectArtist(${a.id}, '${(a.name || '').replace(/'/g, "\\'")}')">
+            <div class="artist-card-avatar">${(a.name || '?').charAt(0)}</div>
+            <div class="artist-card-info">
+                <div class="artist-card-name">${a.name || '未知'}</div>
+                <div class="artist-card-meta">
+                    <span>ID: ${a.id}</span>
+                    <span>· 🖼️ ${a.work_count || 0} 作品</span>
+                    ${a.bookmark_count > 0 ? `<span class="artist-bookmark-tag" title="有 ${a.bookmark_count} 个作品已收藏">⭐ ${a.bookmark_count}</span>` : ''}
+                    ${a.tag_count > 0 ? `<span title="${a.tag_count} 个标签">· 🏷️ ${a.tag_count}</span>` : ''}
+                    ${a.account ? `<span>· @${a.account}</span>` : ''}
+                </div>
+            </div>
+            <div class="artist-card-actions">
+                <button class="btn-sm accent" id="btnUpdate-${a.id}"
+                    onclick="event.stopPropagation(); startIncrementalUpdateFor(${a.id}, '${(a.name || '未知').replace(/'/g, "\\'")}')"
+                    title="增量更新该作者新作品">🔄</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function filterArtists() {
+    let filtered = [...allArtists];
+    
+    // 1. 文本搜索过滤
+    const q = document.getElementById('searchInput').value.trim().toLowerCase();
+    if (q) {
+        filtered = filtered.filter(a =>
+            (a.name || '').toLowerCase().includes(q) ||
+            String(a.id).includes(q) ||
+            (a.account || '').toLowerCase().includes(q)
+        );
+    }
+    
+    // 2. 仅收藏过滤
+    const onlyBookmarked = document.getElementById('filterBookmarked').checked;
+    if (onlyBookmarked) {
+        filtered = filtered.filter(a => (a.bookmark_count || 0) > 0);
+    }
+    
+    // 3. 标签过滤
+    const tagFilter = document.getElementById('tagFilter');
+    if (tagFilter && tagFilter.value) {
+        const selectedTag = tagFilter.value;
+        filtered = filtered.filter(a => allTagArtistMap[selectedTag] && allTagArtistMap[selectedTag].has(a.id));
+    }
+    
+    // 4. 排序
+    const sortBy = document.getElementById('sortBy').value;
+    switch (sortBy) {
+        case 'name':
+            filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            break;
+        case 'work_count_desc':
+            filtered.sort((a, b) => (b.work_count || 0) - (a.work_count || 0));
+            break;
+        case 'work_count_asc':
+            filtered.sort((a, b) => (a.work_count || 0) - (b.work_count || 0));
+            break;
+        case 'bookmark_count_desc':
+            filtered.sort((a, b) => (b.bookmark_count || 0) - (a.bookmark_count || 0));
+            break;
+        case 'bookmark_count_asc':
+            filtered.sort((a, b) => (a.bookmark_count || 0) - (b.bookmark_count || 0));
+            break;
+        case 'tag_count_desc':
+            filtered.sort((a, b) => (b.tag_count || 0) - (a.tag_count || 0));
+            break;
+        case 'tag_count_asc':
+            filtered.sort((a, b) => (a.tag_count || 0) - (b.tag_count || 0));
+            break;
+        case 'created_desc':
+            filtered.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+            break;
+        case 'created_asc':
+            filtered.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+            break;
+        // default: 保持原始顺序
+    }
+    
+    renderArtists(filtered);
+}
+
+function clearArtistFilters() {
+    const search = document.getElementById('searchInput');
+    if (search) search.value = '';
+    const sortBy = document.getElementById('sortBy');
+    if (sortBy) sortBy.value = 'default';
+    const fb = document.getElementById('filterBookmarked');
+    if (fb) fb.checked = false;
+    const tf = document.getElementById('tagFilter');
+    if (tf) tf.value = '';
+    filterArtists();
+}
+
+// ====== 选择作者，右侧展示作品 ======
+
+async function deleteArtist() {
+    if (!currentArtistId) return;
+    const name = currentArtistName || '该作者';
+    if (!confirm(`⚠️ 确定删除作者「${name}」(ID:${currentArtistId}) 及其全部作品吗？\n\n将同时删除磁盘上的作者目录与缩略图，不可恢复！`)) return;
+    try {
+        const r = await fetch(`/api/artist/${currentArtistId}/delete`, { method: 'POST' });
+        const d = await r.json();
+        if (d.success) {
+            showToast(`${d.message}（作品 ${d.data.works_deleted} 个 / 图片 ${d.data.images_deleted} 张）`, 'success');
+            hideRightContent();
+            loadArtists();
+        } else {
+            showToast('删除失败: ' + (d.error || '未知错误'), 'error');
+        }
+    } catch (e) {
+        showToast('请求失败: ' + e.message, 'error');
+    }
+}
+
+async function deleteWork(workId, title) {
+    if (!workId) return;
+    if (!confirm(`⚠️ 确定删除作品「${title || '无标题'}」(ID:${workId}) 吗？\n\n将同时删除该作品的本地图片文件，不可恢复！`)) return;
+    try {
+        const r = await fetch(`/api/work/${workId}/delete`, { method: 'POST' });
+        const d = await r.json();
+        if (d.success) {
+            showToast(d.message || '已删除', 'success');
+            // 刷新当前作者的作品列表
+            if (currentArtistId) selectArtist(currentArtistId, currentArtistName);
+        } else {
+            showToast('删除失败: ' + (d.error || '未知错误'), 'error');
+        }
+    } catch (e) {
+        showToast('请求失败: ' + e.message, 'error');
+    }
+}
+
+function showRightContent() {
+    document.getElementById('rightPlaceholder').style.display = 'none';
+    document.getElementById('rightHeader').style.display = 'flex';
+    document.getElementById('worksScroll').style.display = 'block';
+    // 手机端：作品面板全屏浮层展开
+    const rp = document.querySelector('.right-panel');
+    if (rp) rp.classList.add('mobile-open');
+}
+
+function hideRightContent() {
+    document.getElementById('rightPlaceholder').style.display = 'flex';
+    document.getElementById('rightHeader').style.display = 'none';
+    document.getElementById('worksScroll').style.display = 'none';
+    document.getElementById('updateProgress').classList.remove('active');
+    // 手机端：关闭全屏浮层，回到作者列表
+    const rp = document.querySelector('.right-panel');
+    if (rp) rp.classList.remove('mobile-open');
+}
+
+async function selectArtist(id, name) {
+    // 取消之前正在进行的 fetch 请求
+    if (worksAbortController) {
+        worksAbortController.abort();
+        worksAbortController = null;
+    }
+    // 断开之前的 Intersection Observer（DOM 分批）
+    if (worksObserver) {
+        worksObserver.disconnect();
+        worksObserver = null;
+    }
+    // 断开之前的图片懒加载 observer
+    if (imageObserver) {
+        imageObserver.disconnect();
+        imageObserver = null;
+    }
+    pendingWorks = [];
+    renderedCount = 0;
+    bookmarkedWorkIds = new Set();
+
+    currentArtistId = id;
+    currentArtistName = name;
+
+    // 更新左侧选中状态
+    renderArtists(allArtists.filter(a => {
+        const q = document.getElementById('searchInput').value.trim().toLowerCase();
+        return !q || (a.name || '').toLowerCase().includes(q) || String(a.id).includes(q) || (a.account || '').toLowerCase().includes(q);
+    }));
+
+    showRightContent();
+    document.getElementById('worksPanelTitle').innerHTML =
+        `📂 ${name} 的作品 <a href="https://www.pixiv.net/users/${id}" target="_blank" rel="noopener" title="在 Pixiv 查看该作者" style="color:var(--accent);font-size:13px;text-decoration:none;margin-left:4px;font-weight:500;">🔗</a>`;
+    document.getElementById('worksGrid').innerHTML = '<div class="loading-state"><div class="spinner"></div>加载作品...</div>';
+
+    // 停止之前的更新流
+    stopUpdateStream();
+
+    // 重置更新按钮状态
+    const btn = document.getElementById('btnUpdateArtist');
+    btn.disabled = false;
+    btn.classList.remove('updating');
+    btn.textContent = '🔄 增量更新';
+    document.getElementById('updateProgress').classList.remove('active');
+
+    // 更新作者卡片上的按钮状态
+    updateCardButtons();
+
+    // 创建新的 AbortController
+    worksAbortController = new AbortController();
+
+    try {
+        const resp = await fetch(`/api/artist/${id}/works`, {
+            signal: worksAbortController.signal
+        });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error);
+
+        const works = data.data || [];
+        const grid = document.getElementById('worksGrid');
+
+        if (works.length === 0) {
+            grid.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>暂无作品记录</p></div>';
+            return;
+        }
+
+        // 清空网格
+        grid.innerHTML = '';
+        pendingWorks = works;
+        renderedCount = 0;
+
+        // 批量查询收藏状态（异步，不阻塞渲染）
+        checkBookmarkStatus(works.map(w => w.id));
+
+        // 初始化图片懒加载 observer（逐张激活，真正按需加载）
+        initImageObserver();
+
+        // 先渲染第一批（首屏可见的）
+        renderWorksBatch(grid, works, 0, renderBatchSize);
+
+        // 如果还有更多，用 Intersection Observer 分批渲染剩余
+        if (renderedCount < works.length) {
+            setupWorksObserver(grid);
+        }
+
+    } catch(e) {
+        if (e.name === 'AbortError') {
+            // 请求被取消，正常情况，不报错
+            return;
+        }
+        document.getElementById('worksGrid').innerHTML = `<div class="error-msg">加载失败: ${e.message}</div>`;
+    }
+}
+
+/**
+ * 批量查询当前作者作品的收藏状态
+ */
+async function checkBookmarkStatus(workIds) {
+    if (!workIds || workIds.length === 0) return;
+    try {
+        const resp = await fetch('/api/bookmarks/batch-check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ work_ids: workIds })
+        });
+        const data = await resp.json();
+        if (data.success && data.data) {
+            bookmarkedWorkIds = new Set();
+            for (const [wid, isBm] of Object.entries(data.data)) {
+                if (isBm) bookmarkedWorkIds.add(parseInt(wid));
+            }
+            // 重新渲染当前页以显示收藏标记
+            if (pendingWorks.length > 0) {
+                const grid = document.getElementById('worksGrid');
+                grid.innerHTML = '';
+                renderedCount = 0;
+                renderWorksBatch(grid, pendingWorks, 0, renderBatchSize);
+                if (renderedCount < pendingWorks.length) {
+                    setupWorksObserver(grid);
+                }
+            }
+        }
+    } catch(e) {
+        // 静默失败，不影响主要功能
+        console.warn('查询收藏状态失败:', e);
+    }
+}
+
+/**
+ * 渲染一批作品卡片（仅创建 DOM，图片不加载，由 imageObserver 按需激活）
+ */
+function renderWorksBatch(grid, works, start, count) {
+    const end = Math.min(start + count, works.length);
+    const fragment = document.createDocumentFragment();
+
+    for (let i = start; i < end; i++) {
+        const w = works[i];
+        const downloaded = w.downloaded_count || 0;
+        const total = w.image_count || w.page_count || 1;
+        const allDone = downloaded >= total && total > 0;
+        const firstPath = w.first_image_path;
+
+        const hasMultiplePages = total > 1;
+        const isBookmarked = bookmarkedWorkIds.has(w.id);
+        const card = document.createElement('div');
+        // 单图片作品也能打开查看器（用于查看大图和复制到剪贴板）
+        const clickable = !!firstPath;
+        card.className = 'work-card' + (clickable ? ' clickable' : '');
+        if (clickable) {
+            card.setAttribute('onclick', `openDetail(${w.id})`);
+            card.title = hasMultiplePages ? `点击查看全部 ${total} 页` : '点击查看详情';
+        }
+        card.innerHTML = `
+            <div class="work-card-thumb">
+                ${firstPath
+                    ? `<div class="work-card-skeleton"></div>
+                       <img data-src="/thumbnail/${encodeURIComponent(firstPath)}"
+                            alt=""
+                            onerror="this.style.display='none';this.previousElementSibling.style.display='none';this.parentElement.querySelector('.no-img').style.display='block'"
+                            onload="this.classList.add('loaded');this.previousElementSibling.style.display='none'"
+                            style="position:absolute;top:0;left:0;">
+                       <span class="no-img" style="display:none">🖼️</span>`
+                    : '<span class="no-img">🖼️</span>'}
+                ${hasMultiplePages ? `<span class="work-card-page-indicator">${downloaded}/${total}</span>` : ''}
+                ${isBookmarked ? '<span style="position:absolute;top:6px;left:6px;font-size:14px;z-index:2;filter:drop-shadow(0 0 3px rgba(0,0,0,0.8));" title="已收藏">⭐</span>' : ''}
+                <button class="work-del-btn" onclick="event.stopPropagation(); deleteWork(${w.id}, '${(w.title || '无标题').slice(0, 30).replace(/'/g, "\\'")}')" title="删除该作品（含文件，不可恢复）">🗑</button>
+            </div>
+            <div class="work-card-body">
+                <div class="work-card-title" title="${w.title || '无标题'}">
+                    ${w.title || '无标题'}
+                    ${isBookmarked ? '<span class="bookmark-star" title="已收藏">⭐</span>' : ''}
+                </div>
+                <div class="work-card-meta">
+                    <span>ID: ${w.id} · ${total}P</span>
+                    <span class="work-dl-badge ${allDone ? 'done' : 'miss'}">${allDone ? '✓ 已下载' : `${downloaded}/${total}`}</span>
+                </div>
+            </div>`;
+
+        fragment.appendChild(card);
+    }
+
+    grid.appendChild(fragment);
+    renderedCount = end;
+
+    // 将新加入 DOM 的 img[data-src] 注册到图片懒加载 observer（不再批量激活！）
+    if (imageObserver) {
+        const newImgs = grid.querySelectorAll('img[data-src]');
+        newImgs.forEach(img => imageObserver.observe(img));
+    }
+}
+
+/**
+ * 初始化图片懒加载 observer —— 逐张激活图片，只有进入视口附近才真正加载
+ * 这是解决"点多个作者后图片加载卡死"的核心机制
+ */
+function initImageObserver() {
+    if (imageObserver) {
+        imageObserver.disconnect();
+    }
+
+    imageObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                const src = img.getAttribute('data-src');
+                if (src) {
+                    img.removeAttribute('data-src');
+                    img.src = src;
+                }
+                // 加载后取消观察，避免重复触发
+                imageObserver.unobserve(img);
+            }
+        });
+    }, {
+        root: document.getElementById('worksScroll'),
+        rootMargin: '300px', // 提前 300px 开始加载图片
+        threshold: 0
+    });
+}
+
+/**
+ * 设置 Intersection Observer，当底部哨兵进入视口时渲染下一批
+ */
+function setupWorksObserver(grid) {
+    // 移除旧哨兵
+    const oldSentinel = document.getElementById('worksSentinel');
+    if (oldSentinel) oldSentinel.remove();
+
+    // 创建新哨兵并添加到 grid
+    const sentinel = document.createElement('div');
+    sentinel.id = 'worksSentinel';
+    sentinel.style.cssText = 'height:1px;width:100%;';
+    grid.appendChild(sentinel);
+
+    worksObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                // 哨兵进入视口，渲染下一批
+                if (renderedCount < pendingWorks.length) {
+                    renderWorksBatch(grid, pendingWorks, renderedCount, renderBatchSize);
+                    // 如果还有更多，重新在末尾插入新哨兵
+                    if (renderedCount < pendingWorks.length) {
+                        const s = document.getElementById('worksSentinel');
+                        if (s) s.remove();
+                        const newSentinel = document.createElement('div');
+                        newSentinel.id = 'worksSentinel';
+                        newSentinel.style.cssText = 'height:1px;width:100%;';
+                        grid.appendChild(newSentinel);
+                        worksObserver.observe(newSentinel);
+                    } else {
+                        // 全部渲染完毕，清理
+                        const s = document.getElementById('worksSentinel');
+                        if (s) s.remove();
+                        if (worksObserver) {
+                            worksObserver.disconnect();
+                            worksObserver = null;
+                        }
+                    }
+                }
+            }
+        });
+    }, {
+        root: document.getElementById('worksScroll'),
+        rootMargin: '400px', // 提前 400px 开始加载
+        threshold: 0
+    });
+
+    worksObserver.observe(sentinel);
+}
+
+function closeWorksPanel() {
+    // 取消进行中的 fetch
+    if (worksAbortController) {
+        worksAbortController.abort();
+        worksAbortController = null;
+    }
+    // 断开 DOM 分批 observer
+    if (worksObserver) {
+        worksObserver.disconnect();
+        worksObserver = null;
+    }
+    // 断开图片懒加载 observer
+    if (imageObserver) {
+        imageObserver.disconnect();
+        imageObserver = null;
+    }
+    pendingWorks = [];
+    renderedCount = 0;
+
+    stopUpdateStream();
+    currentArtistId = null;
+    currentArtistName = '';
+    hideRightContent();
+    updateCardButtons();
+    renderArtists(allArtists.filter(a => {
+        const q = document.getElementById('searchInput').value.trim().toLowerCase();
+        return !q || (a.name || '').toLowerCase().includes(q) || String(a.id).includes(q) || (a.account || '').toLowerCase().includes(q);
+    }));
+}
+
+// ====== 增量更新 ======
+
+function updateCardButtons() {
+    // 更新左侧所有作者卡片的更新按钮状态
+    allArtists.forEach(a => {
+        const btn = document.getElementById('btnUpdate-' + a.id);
+        if (btn) {
+            if (updateTaskId && currentArtistId === a.id) {
+                btn.disabled = true;
+                btn.classList.add('updating');
+                btn.textContent = '⏳';
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('updating');
+                btn.textContent = '🔄';
+            }
+        }
+    });
+}
+
+function startIncrementalUpdateFor(id, name) {
+    // 从卡片按钮触发，先选中该作者再开始更新
+    if (currentArtistId !== id) {
+        selectArtist(id, name).then(() => {
+            startIncrementalUpdate();
+        });
+    } else {
+        startIncrementalUpdate();
+    }
+}
+
+async function startIncrementalUpdate() {
+    if (!currentArtistId) return;
+    if (updateTaskId) {
+        // 已经在更新中
+        return;
+    }
+
+    const btn = document.getElementById('btnUpdateArtist');
+    btn.disabled = true;
+    btn.classList.add('updating');
+    btn.textContent = '⏳ 更新中...';
+    updateCardButtons();
+
+    // 显示进度条
+    const progDiv = document.getElementById('updateProgress');
+    progDiv.classList.add('active');
+    document.getElementById('updateProgressTitle').textContent = `🔄 增量更新: ${currentArtistName}`;
+    document.getElementById('updateProgressText').textContent = '提交任务...';
+    document.getElementById('updateProgressBar').style.width = '0%';
+
+    try {
+        const taskId = 'artist_new_' + currentArtistId + '_' + Date.now();
+        const resp = await fetch('/api/download/artist-new', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                artist_id: currentArtistId,
+                task_id: taskId,
+            })
+        });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error);
+
+        updateTaskId = data.task_id;
+        document.getElementById('updateProgressText').textContent = '连接中...';
+
+        // 连接 SSE
+        connectUpdateStream(updateTaskId);
+
+    } catch(e) {
+        updateTaskId = null;
+        document.getElementById('updateProgress').classList.remove('active');
+        btn.disabled = false;
+        btn.classList.remove('updating');
+        btn.textContent = '🔄 增量更新';
+        updateCardButtons();
+        showToast('启动增量更新失败: ' + e.message, 'error');
+    }
+}
+
+function connectUpdateStream(taskId) {
+    stopUpdateStream();
+
+    updateEventSource = new EventSource('/api/stream/' + taskId);
+
+    updateEventSource.addEventListener('connected', function(e) {
+        document.getElementById('updateProgressText').textContent = '已连接，等待开始...';
+    });
+
+    updateEventSource.addEventListener('incremental_info', function(e) {
+        const info = JSON.parse(e.data);
+        document.getElementById('updateProgressText').textContent =
+            `共 ${info.total_works} 个作品，其中 ${info.new_works} 个新作品`;
+    });
+
+    updateEventSource.addEventListener('progress', function(e) {
+        const p = JSON.parse(e.data);
+        const pct = p.total > 0 ? Math.round(p.current / p.total * 100) : 0;
+        document.getElementById('updateProgressBar').style.width = pct + '%';
+        document.getElementById('updateProgressText').textContent = p.message;
+    });
+
+    updateEventSource.addEventListener('complete', function(e) {
+        const result = JSON.parse(e.data);
+        const msg = `完成: 下载${result.downloaded_works || 0}, 跳过${result.skipped_works || 0}, 失败${result.failed_works || 0}`;
+        document.getElementById('updateProgressBar').style.width = '100%';
+        document.getElementById('updateProgressText').textContent = msg;
+        document.getElementById('updateProgressTitle').textContent = '✅ 增量更新完成';
+
+        // 刷新
+        setTimeout(() => {
+            finishUpdate();
+            // 重新加载作者作品
+            if (currentArtistId) {
+                selectArtist(currentArtistId, currentArtistName);
+            }
+        }, 1500);
+    });
+
+    updateEventSource.addEventListener('error', function(e) {
+        document.getElementById('updateProgressTitle').textContent = '❌ 更新出错';
+        setTimeout(() => finishUpdate(), 2000);
+    });
+
+    updateEventSource.onerror = function(e) {
+        // SSE 连接关闭
+        if (updateEventSource && updateEventSource.readyState === EventSource.CLOSED) {
+            setTimeout(() => finishUpdate(), 1000);
+        }
+    };
+}
+
+function stopUpdateStream() {
+    if (updateEventSource) {
+        updateEventSource.close();
+        updateEventSource = null;
+    }
+}
+
+function finishUpdate() {
+    stopUpdateStream();
+    updateTaskId = null;
+    document.getElementById('updateProgress').classList.remove('active');
+    const btn = document.getElementById('btnUpdateArtist');
+    if (btn) {
+        btn.disabled = false;
+        btn.classList.remove('updating');
+        btn.textContent = '🔄 增量更新';
+    }
+    updateCardButtons();
+    // 刷新作者列表（作品数可能变了）
+    loadArtists();
+}
+
+// 搜索回车键
+document.getElementById('searchInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') filterArtists();
+});
+
+// ====== 详情面板 ======
+let currentDetailWork = null;
+
+async function openDetail(workId) {
+    if (!pendingWorks || pendingWorks.length === 0) return;
+    const work = pendingWorks.find(w => w.id === workId);
+    if (!work) return;
+
+    currentDetailWork = work;
+
+    document.getElementById('detailTitle').textContent = work.title || '作品详情';
+    document.getElementById('detailScroll').innerHTML = '<div class="loading-state"><div class="spinner"></div>加载详情...</div>';
+    document.getElementById('detailOverlay').classList.add('active');
+    document.getElementById('detailPanel').classList.add('active');
+
+    try {
+        const resp = await fetch(`/api/work/${workId}/detail`);
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error);
+        renderDetail(data.data);
+    } catch(e) {
+        // 降级：用列表数据渲染
+        renderDetailFallback(work);
+    }
+}
+
+function renderDetail(work) {
+    const desc = work.description || '';
+    const images = work.images || [];
+    const downloadedCount = images.filter(im => im.is_downloaded).length;
+    const totalCount = images.length || work.page_count || 1;
+    const isComplete = downloadedCount >= totalCount;
+    // API 返回的字段映射：work_id, artist.id, artist.name, artist.account
+    const workId = work.work_id || currentDetailWork?.id;
+    const artistId = work.artist?.id || currentDetailWork?.artist_id;
+    const artistName = work.artist?.name || currentDetailWork?.artist_name || '未知';
+
+    const html = `
+        <div class="detail-section">
+            <div class="detail-section-title">📋 基本信息</div>
+            <div class="detail-info-row"><span class="detail-info-label">作品ID</span><span class="detail-info-value">${workId}</span></div>
+            <div class="detail-info-row"><span class="detail-info-label">作者</span><span class="detail-info-value">${artistId ? `<a class="detail-artist-link" href="/artists" onclick="sessionStorage.setItem('gotoArtist','${artistId}');" title="在本地查看此作者的作品">${artistName}</a>` : artistName}</span></div>
+            <div class="detail-info-row"><span class="detail-info-label">页数</span><span class="detail-info-value">${totalCount}P</span></div>
+            <div class="detail-info-row"><span class="detail-info-label">下载状态</span><span class="detail-info-value">${isComplete ? '✅ 已下载' : downloadedCount > 0 ? `⏳ ${downloadedCount}/${totalCount}P` : '✗ 未下载'}</span></div>
+            ${work.width && work.height ? `<div class="detail-info-row"><span class="detail-info-label">尺寸</span><span class="detail-info-value">${work.width} × ${work.height}</span></div>` : ''}
+            <div class="detail-info-row"><span class="detail-info-label">创建时间</span><span class="detail-info-value">${formatDate(work.created_at)}</span></div>
+        </div>
+        ${work.tags && work.tags.length > 0 ? `<div class="detail-section"><div class="detail-section-title">🏷️ 标签 (${work.tags.length})</div><div class="detail-tags">${work.tags.map(t => `<span class="detail-tag">${escapeHtml(t)}</span>`).join('')}</div></div>` : ''}
+        <div class="detail-section">
+            <a class="detail-link" href="https://www.pixiv.net/artworks/${workId}" target="_blank" rel="noopener">🔗 在 Pixiv 查看此作品</a>
+            ${artistId ? `<a class="detail-link" href="/artists" onclick="sessionStorage.setItem('gotoArtist','${artistId}');" style="margin-left:16px;" title="在本地查看此作者的作品">👤 本地作者页</a>` : ''}
+            ${artistId ? `<a class="detail-link" href="https://www.pixiv.net/users/${artistId}" target="_blank" rel="noopener" style="margin-left:16px;">🌐 P站作者页</a>` : ''}
+        </div>
+        ${desc ? `<div class="detail-section"><div class="detail-section-title">📝 作品描述</div><div class="detail-desc">${escapeHtml(desc)}</div></div>` : ''}
+        <div class="detail-section">
+            <div class="detail-section-title">🖼️ 图片列表 (${totalCount}张)</div>
+            <div class="detail-img-grid">
+                ${images.length > 0 ? images.map((img, i) => {
+                    const src = img.file_path ? `/thumbnail/${encodeURIComponent(img.file_path)}` : '';
+                    return `<div class="detail-img-item" onclick="openArtImageViewer(${workId}, ${i})" title="点击查看大图">
+                        ${src ? `<img src="${src}" alt="" onload="this.style.opacity='1'" onerror="this.style.display='none';var ph=this.parentElement.querySelector('.detail-img-placeholder');if(ph)ph.style.display=''"
+                              style="opacity:0;transition:opacity 0.3s ease"><span class="detail-img-placeholder" style="display:none">🖼️</span>`
+                              : '<span class="detail-img-placeholder">🖼️</span>'}
+                        <span class="detail-img-badge">${img.is_downloaded ? '✓' : '✗'} #${img.page || (i+1)}</span>
+                    </div>`;
+                }).join('') : `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">
+                    尚未下载，请先下载此作品<br>
+                    <a href="https://www.pixiv.net/artworks/${workId}" target="_blank" rel="noopener" style="color:var(--accent);">🔗 在Pixiv查看</a>
+                </div>`}
+            </div>
+        </div>
+    `;
+
+    document.getElementById('detailScroll').innerHTML = html;
+}
+
+function renderDetailFallback(work) {
+    const html = `
+        <div class="detail-section">
+            <div class="detail-section-title">📋 基本信息</div>
+            <div class="detail-info-row"><span class="detail-info-label">作品ID</span><span class="detail-info-value">${work.id}</span></div>
+            <div class="detail-info-row"><span class="detail-info-label">作者</span><span class="detail-info-value">${currentArtistName || '未知'}</span></div>
+            <div class="detail-info-row"><span class="detail-info-label">页数</span><span class="detail-info-value">${work.page_count || 1}P</span></div>
+            <div class="detail-info-row"><span class="detail-info-label">下载状态</span><span class="detail-info-value">${(work.images || []).filter(im => im.is_downloaded).length >= (work.page_count || 1) ? '✅ 已下载' : '✗ 未下载'}</span></div>
+        </div>
+        <div class="detail-section">
+            <a class="detail-link" href="https://www.pixiv.net/artworks/${work.id}" target="_blank" rel="noopener">🔗 在 Pixiv 查看此作品</a>
+            ${currentArtistId ? `<a class="detail-link" href="/artists" onclick="sessionStorage.setItem('gotoArtist','${currentArtistId}');" style="margin-left:16px;" title="在本地查看此作者的作品">👤 本地作者页</a>` : ''}
+        </div>
+    `;
+    document.getElementById('detailScroll').innerHTML = html;
+}
+
+function closeDetail() {
+    document.getElementById('detailOverlay').classList.remove('active');
+    document.getElementById('detailPanel').classList.remove('active');
+    currentDetailWork = null;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// ====== 多P图片查看器 ======
+let artViewerData = null;
+let artViewerIndex = 0;
+
+async function openArtImageViewer(workId, startIndex) {
+    // 优先从 /api/work/<id>/detail 获取完整图片列表
+    let images = [];
+    try {
+        const resp = await fetch(`/api/work/${workId}/detail`);
+        const data = await resp.json();
+        if (data.success && data.data.images) {
+            images = data.data.images;
+        }
+    } catch(e) {}
+
+    // 降级：从 pendingWorks 中获取
+    if (images.length === 0) {
+        const work = pendingWorks.find(w => w.id === workId);
+        if (work && work.first_image_path) {
+            images = [{
+                file_path: work.first_image_path,
+                page: 1,
+                is_downloaded: true
+            }];
+        }
+    }
+
+    if (images.length === 0) return;
+
+    artViewerData = {
+        workId,
+        title: currentDetailWork?.title || (pendingWorks.find(w => w.id === workId)?.title) || '无标题',
+        images: images.map(img => ({
+            file_path: img.file_path || '',
+            page: img.page || 1,
+            is_downloaded: img.is_downloaded || false
+        }))
+    };
+
+    artViewerIndex = Math.max(0, Math.min(startIndex || 0, images.length - 1));
+    showArtViewerImage();
+    renderArtViewerThumbnails();
+    document.getElementById('artImageViewerOverlay').classList.add('active');
+    document.getElementById('artViewerTitle').textContent = artViewerData.title;
+    document.getElementById('artViewerPixivLink').href = `https://www.pixiv.net/artworks/${workId}`;
+}
+
+function closeArtImageViewer() {
+    document.getElementById('artImageViewerOverlay').classList.remove('active');
+    artViewerData = null;
+    artViewerIndex = 0;
+}
+
+function showArtViewerImage() {
+    if (!artViewerData) return;
+    const img = artViewerData.images[artViewerIndex];
+    const viewerImg = document.getElementById('artViewerImage');
+    const src = img.file_path;
+    // 大图查看器使用原图路由 /original/，而非缩略图
+    viewerImg.src = src ? (src.startsWith('/original/') ? src : '/original/' + encodeURIComponent(src)) : '';
+
+    document.getElementById('artViewerPageInfo').textContent =
+        `${artViewerIndex + 1} / ${artViewerData.images.length}`;
+    document.getElementById('artViewerPrevBtn').disabled = artViewerIndex <= 0;
+    document.getElementById('artViewerNextBtn').disabled = artViewerIndex >= artViewerData.images.length - 1;
+    updateArtThumbActive();
+}
+
+function artViewerPrev() {
+    if (artViewerData && artViewerIndex > 0) { artViewerIndex--; showArtViewerImage(); }
+}
+
+function artViewerNext() {
+    if (artViewerData && artViewerIndex < artViewerData.images.length - 1) { artViewerIndex++; showArtViewerImage(); }
+}
+
+function artViewerGoTo(index) {
+    if (artViewerData && index >= 0 && index < artViewerData.images.length) { artViewerIndex = index; showArtViewerImage(); }
+}
+
+function renderArtViewerThumbnails() {
+    if (!artViewerData) return;
+    const container = document.getElementById('artViewerThumbnails');
+    container.innerHTML = artViewerData.images.map((img, i) => {
+        const src = img.file_path
+            ? (img.file_path.startsWith('/original/') ? img.file_path : '/original/' + encodeURIComponent(img.file_path))
+            : '';
+        return `<div class="art-viewer-thumb ${i === artViewerIndex ? 'active' : ''}" onclick="artViewerGoTo(${i})" title="第${img.page}页">
+            ${src ? `<img data-src="${src}" alt="" onerror="this.style.display='none'" onload="this.style.display='block'">` : '<span style="color:var(--text-muted);font-size:18px;">🖼️</span>'}
+        </div>`;
+    }).join('');
+
+    const imgs = container.querySelectorAll('img[data-src]');
+    const obs = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const el = entry.target;
+                const s = el.getAttribute('data-src');
+                if (s) { el.removeAttribute('data-src'); el.src = s; }
+                obs.unobserve(el);
+            }
+        });
+    }, { rootMargin: '200px' });
+    imgs.forEach(i => obs.observe(i));
+}
+
+function updateArtThumbActive() {
+    const thumbs = document.querySelectorAll('#artViewerThumbnails .art-viewer-thumb');
+    thumbs.forEach((t, i) => { t.classList.toggle('active', i === artViewerIndex); });
+}
+
+async function copyArtViewerImage() {
+    if (!artViewerData) return;
+    const img = artViewerData.images[artViewerIndex];
+    if (!img || !img.file_path) {
+        showToast('当前图片无本地文件，无法复制', 'error');
+        return;
+    }
+    const btn = document.getElementById('artViewerCopyBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳';
+    try {
+        // 清理路径：去掉可能的 /thumbnail/ 前缀和 URL 编码
+        let fp = img.file_path;
+        const idx = fp.indexOf('/original/');
+        if (idx >= 0) fp = decodeURIComponent(fp.substring(idx + '/original/'.length));
+
+        // 直接 fetch 原图，拿到原始格式 blob（保持原格式原质量，本地/局域网均最优）
+        const resp = await fetch('/original/' + encodeURIComponent(fp));
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        const mime = blob.type || 'image/png';
+        await navigator.clipboard.write([new ClipboardItem({ [mime]: blob })]);
+
+        btn.classList.add('copied');
+        btn.textContent = '✅';
+    } catch(e) {
+        btn.textContent = '❌';
+        console.error('复制失败:', e);
+    }
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('copied'); btn.textContent = '📋'; }, 1400);
+}
+
+async function copyArtViewerImageFile() {
+    if (!artViewerData) return;
+    const img = artViewerData.images[artViewerIndex];
+    if (!img || !img.file_path) {
+        showToast('当前图片无本地文件，无法复制', 'error');
+        return;
+    }
+    let fp = img.file_path;
+    const idx = fp.indexOf('/original/');
+    if (idx >= 0) fp = decodeURIComponent(fp.substring(idx + '/original/'.length));
+
+    const btn = document.getElementById('artViewerCopyFileBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳';
+    try {
+        const r = await fetch('/api/image/copy-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file_path: fp })
+        });
+        const d = await r.json();
+        if (d.success) {
+            btn.classList.add('copied');
+            btn.textContent = '✅';   // 成功：图标即时反馈，不弹窗
+        } else {
+            btn.textContent = '❌';
+            console.error('复制文件失败:', d.error);
+        }
+    } catch (e) {
+        btn.textContent = '❌';
+        console.error('复制文件失败:', e.message);
+    }
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('copied'); btn.textContent = '📁'; }, 1400);
+}
+
+// 键盘事件 - 作者页查看器
+document.addEventListener('keydown', function(e) {
+    if (!artViewerData) return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); artViewerPrev(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); artViewerNext(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeArtImageViewer(); }
+});
+
+// ====== 自动选中从其他页面跳转过来的作者 ======
+async function checkGotoArtist() {
+    const gotoId = sessionStorage.getItem('gotoArtist');
+    if (!gotoId) return;
+    sessionStorage.removeItem('gotoArtist'); // 用完即删，避免刷新时重复触发
+
+    const targetId = parseInt(gotoId);
+    if (isNaN(targetId)) return;
+
+    const artist = allArtists.find(a => a.id === targetId);
+    if (!artist) {
+        // 该作者不在数据库中，可能是还没同步过
+        return;
+    }
+
+    // 先清除搜索框，确保该作者可见
+    document.getElementById('searchInput').value = '';
+    renderArtists(allArtists);
+
+    // 选中该作者
+    await selectArtist(targetId, artist.name);
+
+    // 滚动左侧列表使该作者卡片可见
+    requestAnimationFrame(() => {
+        const cards = document.querySelectorAll('.artist-card');
+        for (const card of cards) {
+            if (card.classList.contains('selected')) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                break;
+            }
+        }
+    });
+}
+
+loadArtists().then(() => checkGotoArtist());
+if (isLocalHost()) document.getElementById('artViewerCopyFileBtn').style.display = '';
+</script>
+
+</body>
+</html>

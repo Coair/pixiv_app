@@ -1,0 +1,149 @@
+/* ==========================================================
+   公共基础样式（所有页面共享）
+   包含：CSS 变量、reset、body、侧边栏、移动端底部导航
+   各页面原有的重复定义已移除，统一在此维护
+   ========================================================== */
+
+:root {
+  --bg-primary: #0b0e11;
+  --bg-secondary: #14181d;
+  --bg-card: #1a1f26;
+  --bg-card-hover: #1e2430;
+  --bg-input: #0f1419;
+  --border: #252a33;
+  --border-light: #2e3440;
+  --text-primary: #eaecf0;
+  --text-secondary: #8b98a5;
+  --text-muted: #536471;
+  --accent: #3291e6;
+  --accent-dim: rgba(50,145,230,0.12);
+  --accent-glow: rgba(50,145,230,0.25);
+  --green: #00b578;
+  --green-dim: rgba(0,181,120,0.12);
+  --red: #f04351;
+  --red-dim: rgba(240,67,81,0.12);
+  --orange: #f0a040;
+  --orange-dim: rgba(240,160,64,0.12);
+  --purple: #7c5cfc;
+  --purple-dim: rgba(124,92,252,0.12);
+  --yellow: #f5d547;
+  --yellow-dim: rgba(245,213,71,0.12);
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-xs: 8px;
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ====== 侧边栏 ====== */
+.sidebar {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 230px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  padding: 24px 0;
+  z-index: 100;
+  display: flex; flex-direction: column;
+}
+.sidebar-logo {
+  padding: 0 20px 20px;
+  font-size: 18px; font-weight: 800;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 10px;
+  letter-spacing: -0.3px;
+}
+.sidebar-logo .logo-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 20px; margin: 2px 10px;
+  color: var(--text-secondary);
+  text-decoration: none; font-size: 14px; font-weight: 500;
+  border-radius: var(--radius-xs);
+  transition: all var(--transition);
+  position: relative;
+}
+.nav-item:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+.nav-item.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+.nav-item .nav-icon { font-size: 18px; width: 22px; text-align: center; }
+.nav-spacer { flex: 1; }
+.nav-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text-muted);
+  margin: 0 10px;
+}
+
+/* ====== 底部 Tab 导航栏（仅移动端） ====== */
+.mobile-tab-bar {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0; height: 56px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  z-index: 250;
+  padding: 0 env(safe-area-inset-bottom);
+}
+@media (max-width: 768px) {
+  .mobile-tab-bar { display: flex; }
+}
+.mobile-tab {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: var(--text-muted); text-decoration: none;
+  font-size: 10px; font-weight: 500;
+  transition: color var(--transition);
+  gap: 3px;
+}
+.mobile-tab .tab-icon { font-size: 20px; line-height: 1; }
+.mobile-tab.active { color: var(--accent); }
+
+/* 移动端"更多"菜单 */
+.more-toggle { display: none; }
+.mobile-more-sheet {
+  display: none; position: fixed; bottom: 56px; left: 0; right: 0;
+  background: var(--bg-secondary); border-top: 1px solid var(--border);
+  flex-direction: column; z-index: 249; padding: 8px;
+}
+.more-toggle:checked ~ .mobile-more-sheet { display: flex; }
+.mobile-more-sheet a {
+  display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+  color: var(--text-primary); text-decoration: none; font-size: 14px;
+  border-radius: 8px;
+}
+.mobile-more-sheet a:hover { background: var(--bg-card-hover); }
+.mobile-more-sheet .tab-icon { font-size: 18px; }
+
+/* 更多菜单中标记当前页 */
+.mobile-more-sheet a.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 移动端统一隐藏侧边栏，由底部 Tab 导航接管
+   （各页面自己的 .sidebar{display:flex} 在引入顺序上更靠后，这里需要 !important） */
+@media (max-width: 768px) {
+  .sidebar { display: none !important; }
+}

@@ -1,0 +1,17 @@
+{
+    "download_path": "F:\\00download\\pixiv",
+    "db_path": "pixiv_downloader.db",
+    "cookie": "",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "delay": 2.0,
+    "timeout": 30,
+    "chunk_size": 8192,
+    "max_retries": 3,
+    "retry_delay": 5.0,
+    "api_base_url": "https://www.pixiv.net/ajax",
+    "filter_enabled": true,
+    "filter_max_pages": 30,
+    "filter_batch_same_day": 5,
+    "filter_batch_avg_pages": 10,
+    "bookmark_skip_filter": true
+}

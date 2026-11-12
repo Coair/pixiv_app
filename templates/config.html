@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixiv Downloader - 系统配置</title>
+<link rel="stylesheet" href="/static/base.css">
+<style>
+
+.sidebar {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 230px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  padding: 24px 0; z-index: 100;
+  display: flex; flex-direction: column;
+}
+
+.main {
+  margin-left: 230px;
+  padding: 28px 36px;
+  max-width: 900px;
+}
+.page-title {
+  font-size: 26px; font-weight: 800;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+.page-desc {
+  font-size: 14px; color: var(--text-muted);
+  margin-bottom: 28px;
+}
+
+/* ====== 表单卡片 ====== */
+.config-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 18px;
+  overflow: hidden;
+  animation: fadeIn 0.3s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.config-card-header {
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.config-card-header h2 {
+  font-size: 15px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+}
+.config-card-header .icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.config-card-header .icon.blue { background: var(--accent-dim); color: var(--accent); }
+.config-card-header .icon.green { background: var(--green-dim); color: var(--green); }
+.config-card-header .icon.orange { background: var(--orange-dim); color: var(--orange); }
+
+.config-card-body { padding: 20px 22px; }
+
+.form-row {
+  display: flex; gap: 16px; margin-bottom: 16px;
+  flex-wrap: wrap; align-items: flex-end;
+}
+.form-row:last-child { margin-bottom: 0; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { width: 100%; }
+.form-group.half { flex: 1; min-width: 200px; }
+.form-label {
+  font-size: 12px; color: var(--text-muted);
+  font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.form-input {
+  padding: 9px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-size: 14px; outline: none;
+  transition: border-color var(--transition);
+  font-family: inherit;
+}
+.form-input:focus { border-color: var(--accent); }
+.form-input::placeholder { color: var(--text-muted); }
+textarea.form-input {
+  resize: vertical;
+  min-height: 100px;
+  font-family: 'Consolas', 'SF Mono', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.form-hint {
+  font-size: 11px; color: var(--text-muted);
+  margin-top: 2px;
+}
+.form-hint .highlight { color: var(--green); }
+
+.btn {
+  padding: 9px 20px; border: none; border-radius: var(--radius-xs);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: all var(--transition);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #287dc4; }
+.btn-outline {
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+.btn-outline:hover { color: var(--text-primary); border-color: var(--border-light); }
+.btn-sm { padding: 6px 14px; font-size: 12px; }
+
+.btn-group { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+
+.toast {
+  position: fixed; top: 24px; right: 24px;
+  padding: 12px 20px; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 600; z-index: 999;
+  animation: slideIn 0.3s ease-out;
+  pointer-events: none;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.toast.success { background: var(--green); color: #fff; }
+.toast.error { background: var(--red); color: #fff; }
+.toast.info { background: var(--accent); color: #fff; }
+
+/* ====== Cookie 状态指示器 ====== */
+.cookie-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; padding: 6px 12px;
+  border-radius: 6px; margin-top: 8px;
+}
+.cookie-status.set { background: var(--green-dim); color: var(--green); }
+.cookie-status.unset { background: var(--orange-dim); color: var(--orange); }
+.cookie-status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block;
+}
+.cookie-status-dot.set { background: var(--green); }
+.cookie-status-dot.unset { background: var(--orange); }
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative; display: inline-block; width: 44px; height: 24px;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 24px; transition: all var(--transition);
+}
+.toggle-slider:before {
+  content: ""; position: absolute; height: 18px; width: 18px;
+  left: 2px; bottom: 2px;
+  background: var(--text-muted); border-radius: 50%;
+  transition: all var(--transition);
+}
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--accent); border-color: var(--accent);
+}
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(20px); background: #fff;
+}
+
+.icon.purple { background: rgba(124,92,252,0.12); color: var(--purple); }
+/* ====== 手机端适配 ====== */
+@media (max-width: 768px) {
+  .main { margin-left: 0; padding: 12px 12px 80px; max-width: 100%; }
+  .page-title { font-size: 20px; }
+  .page-desc { font-size: 12px; }
+
+  .config-card-body { padding: 16px; }
+  .config-card-header { padding: 14px 16px; }
+
+  .form-row { flex-direction: column; align-items: stretch; gap: 12px; }
+  .form-group.half { width: 100%; min-width: 0; }
+  .form-input { width: 100%; font-size: 16px; }
+
+  .btn { min-height: 42px; }
+  .btn-group { flex-wrap: wrap; }
+  .btn-group .btn { flex: 1 1 auto; }
+
+  .toast { left: 12px; right: 12px; top: 12px; }
+}
+</style>
+<script src="/static/common.js"></script>
+</head>
+<body>
+
+{% set active_tab = 'config' %}
+{% include '_mobile_nav.html' %}
+
+{% set active_nav = 'config' %}
+{% include '_sidebar.html' %}
+
+<div class="main">
+    <h1 class="page-title">⚙️ 系统配置</h1>
+    <p class="page-desc">管理 Pixiv 认证、下载路径和其他参数</p>
+
+    <!-- 访问模式提示 -->
+    <div id="accessModeRow" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;"></div>
+
+    <!-- Pixiv 认证 -->
+    <div class="config-card">
+        <div class="config-card-header">
+            <span class="icon blue">🔑</span>
+            <h2>Pixiv 认证</h2>
+        </div>
+        <div class="config-card-body">
+            <div class="form-row">
+                <div class="form-group full">
+                    <label class="form-label">Cookie 内容</label>
+                    <textarea class="form-input" id="cookieContent" placeholder="可直接粘贴 Cookie 字符串，或使用下方「导入文件」功能..."></textarea>
+                    <span class="cookie-status" id="cookieStatus">
+                        <span class="cookie-status-dot unset"></span> 未设置
+                    </span>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group full">
+                    <label class="form-label">📂 从 Cookie 文件导入（Netscape 格式，浏览器插件导出）</label>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" class="form-input" id="cookieFilePath" placeholder="文件路径，例如: cookies_www.pixiv.net.txt" style="flex:1;">
+                        <button class="btn btn-primary btn-sm" onclick="loadCookieFile()">📥 导入文件</button>
+                    </div>
+                    <span class="form-hint" id="defaultCookieHint"></span>
+                    <span class="form-hint" id="cookieImportInfo" style="display:none;"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 路径设置 -->
+    <div class="config-card">
+        <div class="config-card-header">
+            <span class="icon green">📁</span>
+            <h2>路径设置</h2>
+        </div>
+        <div class="config-card-body">
+            <div class="form-row">
+                <div class="form-group half">
+                    <label class="form-label">下载目录</label>
+                    <input type="text" class="form-input" id="downloadPath">
+                </div>
+                <div class="form-group half">
+                    <label class="form-label">数据库路径</label>
+                    <input type="text" class="form-input" id="dbPath">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 下载设置 -->
+    <div class="config-card">
+        <div class="config-card-header">
+            <span class="icon orange">⚡</span>
+            <h2>下载设置</h2>
+        </div>
+        <div class="config-card-body">
+            <div class="form-row">
+                <div class="form-group half">
+                    <label class="form-label">API 请求延迟 (秒)</label>
+                    <input type="number" class="form-input" id="apiDelay" step="0.1" min="0">
+                </div>
+                <div class="form-group half">
+                    <label class="form-label">图片下载延迟 (秒)</label>
+                    <input type="number" class="form-input" id="downloadDelay" step="0.1" min="0">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group half">
+                    <label class="form-label">请求超时 (秒)</label>
+                    <input type="number" class="form-input" id="requestTimeout" min="1">
+                </div>
+                <div class="form-group half">
+                    <label class="form-label">下载块大小 (KB)</label>
+                    <input type="number" class="form-input" id="chunkSize" min="1">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group half">
+                    <label class="form-label">最大重试次数</label>
+                    <input type="number" class="form-input" id="maxRetries" min="0">
+                </div>
+                <div class="form-group half">
+                    <label class="form-label">重试延迟 (秒)</label>
+                    <input type="number" class="form-input" id="retryDelay" step="0.1" min="0">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group half">
+                    <label class="form-label">图片并发下载数</label>
+                    <input type="number" class="form-input" id="downloadConcurrency" min="1" max="16">
+                </div>
+                <div class="form-group half">
+                    <label class="form-label" style="opacity:0;">占位</label>
+                    <span class="form-hint">同一作品多页并行下载，建议 3-6，过高易触发风控</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI批量作品过滤 -->
+    <div class="config-card">
+        <div class="config-card-header">
+            <span class="icon purple">🛡️</span>
+            <h2>AI 批量作品过滤</h2>
+        </div>
+        <div class="config-card-body">
+            <div class="form-row">
+                <div class="form-group half" style="min-width:auto;flex:none;">
+                    <label class="form-label">启用过滤</label>
+                    <div style="display:flex;align-items:center;height:38px;gap:10px;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="filterEnabled" onchange="updateToggleLabel()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span id="filterEnabledLabel" style="font-size:13px;color:var(--text-muted);">关闭</span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group half">
+                    <label class="form-label">最大页数阈值</label>
+                    <input type="number" class="form-input" id="filterMaxPages" min="1" max="500">
+                    <span class="form-hint">超过此页数的作品将被自动跳过（设为0不限制）</span>
+                </div>
+                <div class="form-group half">
+                    <label class="form-label">批量检测: 同日上传数</label>
+                    <input type="number" class="form-input" id="filterBatchSameDay" min="2" max="100">
+                    <span class="form-hint">同作者同一天上传超过此数量的作品则怀疑批量</span>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group half">
+                    <label class="form-label">批量检测: 平均页数</label>
+                    <input type="number" class="form-input" id="filterBatchAvgPages" min="1" max="500">
+                    <span class="form-hint">批量检测时，平均页数超过此值才触发过滤</span>
+                </div>
+            </div>
+            <div class="form-row" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+                <div class="form-group half" style="min-width:auto;flex:none;">
+                    <label class="form-label">⭐ 收藏下载跳过过滤</label>
+                    <div style="display:flex;align-items:center;height:38px;gap:10px;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="bookmarkSkipFilter">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span style="font-size:13px;color:var(--text-muted);">收藏下载时跳过所有AI过滤，直接下载全部页数</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="btn-group" style="margin-bottom:32px;">
+        <button class="btn btn-primary" onclick="saveConfig()">💾 保存配置</button>
+        <button class="btn btn-outline" onclick="loadConfig()">🔄 重新加载</button>
+    </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script>
+function showToast(msg, type) {
+    type = type || 'info';
+    const container = document.getElementById('toastContainer');
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    container.appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; }, 2000);
+    setTimeout(() => el.remove(), 2500);
+}
+
+async function loadConfig() {
+    try {
+        const r = await fetch('/api/config');
+        const d = await r.json();
+        if (!d.success) throw new Error(d.error);
+        const c = d.data;
+
+        document.getElementById('cookieContent').value = c.cookie || '';
+        document.getElementById('downloadPath').value = c.download_path || '';
+        document.getElementById('dbPath').value = c.db_path || '';
+        document.getElementById('apiDelay').value = c.delay || 1;
+        document.getElementById('downloadDelay').value = c.download_delay || 0.5;
+        document.getElementById('requestTimeout').value = c.timeout || 30;
+        document.getElementById('chunkSize').value = c.chunk_size || 8192;
+        document.getElementById('maxRetries').value = c.max_retries || 3;
+        document.getElementById('retryDelay').value = c.retry_delay || 2;
+        document.getElementById('downloadConcurrency').value = c.download_concurrency || 4;
+
+        // 过滤配置
+        document.getElementById('filterEnabled').checked = c.filter_enabled !== false;
+        document.getElementById('filterMaxPages').value = c.filter_max_pages || 30;
+        document.getElementById('filterBatchSameDay').value = c.filter_batch_same_day || 5;
+        document.getElementById('filterBatchAvgPages').value = c.filter_batch_avg_pages || 10;
+        document.getElementById('bookmarkSkipFilter').checked = c.bookmark_skip_filter !== false;
+        updateToggleLabel();
+
+        updateAccessMode();
+        updateCookieStatus();
+        checkDefaultCookie();
+    } catch(e) {
+        showToast('加载配置失败: ' + e.message, 'error');
+    }
+}
+
+function updateToggleLabel() {
+    const checked = document.getElementById('filterEnabled').checked;
+    document.getElementById('filterEnabledLabel').textContent = checked ? '已开启' : '已关闭';
+    document.getElementById('filterEnabledLabel').style.color = checked ? 'var(--green)' : 'var(--text-muted)';
+}
+
+function updateAccessMode() {
+    const row = document.getElementById('accessModeRow');
+    if (!row) return;
+    const isLocal = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+    const pill = (text, bg, fg) =>
+        `<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;background:${bg};color:${fg};">${text}</span>`;
+    const hints = [];
+    if (isLocal) {
+        row.innerHTML =
+            pill('🖥️ 本机访问', 'var(--accent-dim)', 'var(--accent)') +
+            pill('📁 可复制文件本体', 'var(--green-dim)', 'var(--green)');
+        hints.push('<span style="font-size:12px;color:var(--text-muted);">图片查看器内可用「复制文件」直接粘贴到文件夹</span>');
+    } else {
+        row.innerHTML =
+            pill('🌐 局域网访问', 'var(--purple-dim)', 'var(--purple)') +
+            pill('📋 仅复制图片', 'var(--orange-dim)', 'var(--orange)');
+        hints.push('<span style="font-size:12px;color:var(--text-muted);">「复制文件」仅在本机打开时可用</span>');
+    }
+    const hint = document.createElement('span');
+    hint.style.cssText = 'width:100%;font-size:12px;color:var(--text-muted);';
+    hint.textContent = hints[0].replace(/<[^>]*>/g, '');
+    row.appendChild(hint);
+}
+
+function updateCookieStatus() {
+    const hasCookie = document.getElementById('cookieContent').value.trim().length > 0;
+    const el = document.getElementById('cookieStatus');
+    if (hasCookie) {
+        el.className = 'cookie-status set';
+        el.innerHTML = '<span class="cookie-status-dot set"></span> Cookie 已设置';
+    } else {
+        el.className = 'cookie-status unset';
+        el.innerHTML = '<span class="cookie-status-dot unset"></span> 未设置 Cookie';
+    }
+}
+
+async function checkDefaultCookie() {
+    try {
+        const r = await fetch('/api/config/check-default-cookie');
+        const d = await r.json();
+        const hint = document.getElementById('defaultCookieHint');
+        if (d.success && d.data && d.data.found && d.data.files.length) {
+            const path = d.data.files[0];
+            document.getElementById('cookieFilePath').value = path;
+            hint.innerHTML = `<span class="highlight">✅ 检测到默认 Cookie 文件</span>
+                <button class="btn btn-outline btn-sm" onclick="importDefaultCookie()" style="margin-left:8px;">⚡ 一键导入</button>`;
+        } else {
+            hint.textContent = '未检测到默认 Cookie 文件，请手动输入路径，或直接在上方粘贴 Cookie 字符串';
+        }
+    } catch(e) {}
+}
+
+async function importDefaultCookie() {
+    await loadCookieFile(document.getElementById('cookieFilePath').value);
+}
+
+async function loadCookieFile(pathOverride) {
+    const filePath = (pathOverride || document.getElementById('cookieFilePath').value).trim();
+    if (!filePath) { showToast('请输入 Cookie 文件路径', 'error'); return; }
+    try {
+        const r = await fetch('/api/config/cookie-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file_path: filePath })
+        });
+        const d = await r.json();
+        if (d.success) {
+            document.getElementById('cookieFilePath').value = filePath;
+            document.getElementById('cookieContent').value = d.data.cookie || '';
+            updateCookieStatus();
+            renderCookieStats(d.data.stats);
+            showToast(d.message || 'Cookie 导入成功', 'success');
+        } else {
+            showToast(d.error || '加载失败', 'error');
+        }
+    } catch(e) {
+        showToast('请求失败: ' + e.message, 'error');
+    }
+}
+
+function renderCookieStats(stats) {
+    const el = document.getElementById('cookieImportInfo');
+    if (!stats) { el.style.display = 'none'; return; }
+    const domains = Object.entries(stats.domains || {}).map(([k, v]) => `${k}(${v})`).join(', ');
+    let html = `已导入 ${stats.used} 个 Cookie`;
+    if (stats.skipped) html += ` · 已跳过非 Pixiv ${stats.skipped} 个`;
+    if (stats.expired) html += ` · 已过期 ${stats.expired} 个`;
+    if (stats.keys && stats.keys.includes('PHPSESSID')) {
+        html += ` · <span class="highlight">含 PHPSESSID ✅</span>`;
+    } else {
+        html += ` · <span style="color:var(--orange);">⚠️ 未检测到 PHPSESSID（登录态可能失效）</span>`;
+    }
+    if (domains) html += `<br>域名: ${domains}`;
+    el.innerHTML = html;
+    el.style.display = 'block';
+}
+
+async function saveConfig() {
+    const data = {
+        cookie: document.getElementById('cookieContent').value,
+        download_path: document.getElementById('downloadPath').value,
+        db_path: document.getElementById('dbPath').value,
+        delay: parseFloat(document.getElementById('apiDelay').value) || 1,
+        download_delay: parseFloat(document.getElementById('downloadDelay').value) || 0.5,
+        timeout: parseInt(document.getElementById('requestTimeout').value) || 30,
+        chunk_size: parseInt(document.getElementById('chunkSize').value) || 8192,
+        max_retries: parseInt(document.getElementById('maxRetries').value) || 3,
+        retry_delay: parseFloat(document.getElementById('retryDelay').value) || 2,
+        download_concurrency: parseInt(document.getElementById('downloadConcurrency').value) || 4,
+        filter_enabled: document.getElementById('filterEnabled').checked,
+        filter_max_pages: parseInt(document.getElementById('filterMaxPages').value) || 30,
+        filter_batch_same_day: parseInt(document.getElementById('filterBatchSameDay').value) || 5,
+        filter_batch_avg_pages: parseInt(document.getElementById('filterBatchAvgPages').value) || 10,
+        bookmark_skip_filter: document.getElementById('bookmarkSkipFilter').checked,
+    };
+
+    try {
+        const r = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const d = await r.json();
+        if (d.success) {
+            updateCookieStatus();
+            showToast('配置保存成功', 'success');
+        } else {
+            showToast(d.error || '保存失败', 'error');
+        }
+    } catch(e) {
+        showToast('请求失败: ' + e.message, 'error');
+    }
+}
+
+// 监听 cookie 内容变化
+document.getElementById('cookieContent').addEventListener('input', updateCookieStatus);
+
+loadConfig();
+</script>
+</body>
+</html>

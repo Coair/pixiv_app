@@ -1,0 +1,31 @@
+<!-- 移动端底部导航（公共片段，使用前设置 active_tab 变量） -->
+{% set more_active = active_tab in ['download', 'sync', 'config'] %}
+<nav class="mobile-tab-bar">
+    <a href="/" class="mobile-tab{% if active_tab == 'index' %} active{% endif %}">
+        <span class="tab-icon">📊</span> 仪表盘
+    </a>
+    <a href="/images" class="mobile-tab{% if active_tab == 'images' %} active{% endif %}">
+        <span class="tab-icon">🖼️</span> 图片
+    </a>
+    <a href="/artists" class="mobile-tab{% if active_tab == 'artists' %} active{% endif %}">
+        <span class="tab-icon">👤</span> 作者
+    </a>
+    <a href="/bookmarks" class="mobile-tab{% if active_tab == 'bookmarks' %} active{% endif %}">
+        <span class="tab-icon">⭐</span> 收藏
+    </a>
+    <input type="checkbox" id="moreToggle" class="more-toggle">
+    <label for="moreToggle" class="mobile-tab{% if more_active %} active{% endif %}">
+        <span class="tab-icon">⋯</span> 更多
+    </label>
+    <div class="mobile-more-sheet">
+        <a href="/download" class="{% if active_tab == 'download' %}active{% endif %}">
+            <span class="tab-icon">⬇️</span> 下载管理
+        </a>
+        <a href="/sync" class="{% if active_tab == 'sync' %}active{% endif %}">
+            <span class="tab-icon">🔄</span> 本地同步
+        </a>
+        <a href="/config" class="{% if active_tab == 'config' %}active{% endif %}">
+            <span class="tab-icon">⚙️</span> 系统配置
+        </a>
+    </div>
+</nav>

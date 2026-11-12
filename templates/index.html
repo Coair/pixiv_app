@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixiv Downloader - 仪表盘</title>
+<link rel="stylesheet" href="/static/base.css">
+<style>
+
+/* ====== 主内容 ====== */
+.main {
+  margin-left: 230px;
+  padding: 28px 36px;
+  max-width: 1300px;
+}
+.page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 28px;
+}
+.page-title {
+  font-size: 26px; font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+.page-subtitle { font-size: 14px; color: var(--text-muted); margin-top: 2px; }
+
+/* ====== 统计卡片网格 ====== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 32px;
+}
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  transition: all var(--transition);
+  position: relative; overflow: hidden;
+  cursor: default;
+}
+.stat-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--purple));
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.stat-card:hover {
+  border-color: var(--border-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.stat-card:hover::before { opacity: 1; }
+.stat-icon {
+  width: 42px; height: 42px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; margin-bottom: 14px;
+}
+.stat-icon.blue { background: var(--accent-dim); color: var(--accent); }
+.stat-icon.green { background: var(--green-dim); color: var(--green); }
+.stat-icon.red { background: var(--red-dim); color: var(--red); }
+.stat-icon.orange { background: var(--orange-dim); color: var(--orange); }
+.stat-icon.purple { background: var(--purple-dim); color: var(--purple); }
+.stat-label {
+  font-size: 12px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.8px;
+  margin-bottom: 4px; font-weight: 600;
+}
+.stat-value {
+  font-size: 30px; font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.stat-value.accent { color: var(--accent); }
+.stat-sub {
+  font-size: 11px; color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* ====== 面板 ====== */
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-header h2 {
+  font-size: 15px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+}
+.panel-body { padding: 4px 0; }
+.panel-body.scrollable { max-height: 460px; overflow-y: auto; }
+.panel-body::-webkit-scrollbar { width: 4px; }
+.panel-body::-webkit-scrollbar-track { background: transparent; }
+.panel-body::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+
+/* ====== 快捷操作 ====== */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.action-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  text-decoration: none; color: inherit;
+  transition: all var(--transition);
+  display: flex; align-items: center; gap: 14px;
+}
+.action-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  transform: translateY(-1px);
+}
+.action-card .ac-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: var(--accent-dim);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+  color: var(--accent);
+}
+.action-card .ac-text h3 {
+  font-size: 14px; font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.action-card .ac-text p {
+  font-size: 12px; color: var(--text-muted);
+}
+
+/* ====== 最近下载瀑布流网格 ====== */
+.recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 12px 16px;
+}
+.recent-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.recent-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.recent-card-thumb {
+  width: 100%;
+  aspect-ratio: 3/4;
+  background: var(--bg-primary);
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.recent-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.recent-card-thumb img.loaded { opacity: 1; }
+/* 骨架屏 */
+.recent-card-skeleton {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--bg-primary) 25%, var(--bg-card) 50%, var(--bg-primary) 75%);
+  background-size: 200% 100%;
+  animation: recent-shimmer 1.5s ease-in-out infinite;
+}
+@keyframes recent-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.recent-card-thumb .no-img {
+  font-size: 36px;
+  color: var(--text-muted);
+  opacity: 0.25;
+}
+.recent-card-body {
+  padding: 8px 10px;
+}
+.recent-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+.recent-card-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.recent-card-author {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.recent-card-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.recent-card-badge.full { background: var(--green-dim); color: var(--green); }
+.recent-card-badge.partial { background: var(--orange-dim); color: var(--orange); }
+.recent-card-page-indicator {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  z-index: 2;
+}
+
+/* ====== 过滤记录 ====== */
+.filter-record {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 20px; border-bottom: 1px solid var(--border);
+  transition: background var(--transition);
+}
+.filter-record:last-child { border-bottom: none; }
+.filter-record:hover { background: var(--bg-card-hover); }
+.filter-reason-badge {
+  font-size: 11px; padding: 3px 10px; border-radius: 6px;
+  background: var(--purple-dim); color: var(--purple);
+  white-space: nowrap; flex-shrink: 0; font-weight: 600;
+}
+.filter-record-info { flex: 1; min-width: 0; }
+.filter-record-title {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.filter-record-meta {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+}
+.filter-record-time {
+  font-size: 11px; color: var(--text-muted); flex-shrink: 0;
+}
+
+/* ====== 加载/空状态 ====== */
+.empty-state {
+  text-align: center; padding: 40px 20px;
+  color: var(--text-muted);
+}
+.empty-state .icon { font-size: 40px; margin-bottom: 10px; opacity: 0.5; }
+.empty-state p { font-size: 14px; }
+.loading-state {
+  text-align: center; padding: 40px 20px;
+  color: var(--text-muted);
+}
+.spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.4s ease-out; }
+.error-msg { color: var(--red); text-align: center; padding: 20px; font-size: 14px; }
+
+/* ====== 徽标 ====== */
+.badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 6px;
+  font-weight: 600; display: inline-flex; align-items: center; gap: 4px;
+}
+.badge.new { background: var(--green-dim); color: var(--green); }
+.badge.warn { background: var(--orange-dim); color: var(--orange); }
+
+/* ====== 工具提示 ====== */
+.tooltip {
+  position: relative;
+  cursor: help;
+  border-bottom: 1px dotted var(--text-muted);
+}
+
+/* ====== 仪表盘右侧滑出详情面板（与收藏页一致） ====== */
+.dash-right-panel {
+  position: fixed; right: -520px; top: 0; bottom: 0; width: 500px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  z-index: 200;
+  display: flex; flex-direction: column;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -4px 0 30px rgba(0,0,0,0.4);
+}
+.dash-right-panel.open { right: 0; }
+.dash-panel-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 199; opacity: 0; pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.dash-panel-overlay.active { opacity: 1; pointer-events: auto; }
+.dash-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.dash-panel-header h2 {
+  font-size: 15px; font-weight: 700;
+  max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dash-panel-close {
+  background: none; border: 1px solid var(--border); color: var(--text-secondary);
+  font-size: 16px; width: 32px; height: 32px; border-radius: 8px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition); flex-shrink: 0;
+}
+.dash-panel-close:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+.dash-panel-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+.dash-panel-body::-webkit-scrollbar { width: 4px; }
+.dash-panel-body::-webkit-scrollbar-track { background: transparent; }
+.dash-panel-body::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+
+/* 详情面板内部样式（与收藏页一致） */
+.dash-detail-section { margin-bottom: 16px; }
+.dash-detail-section-title {
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+}
+.dash-detail-info-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; font-size: 13px;
+}
+.dash-detail-info-label { color: var(--text-muted); }
+.dash-detail-info-value { color: var(--text-primary); font-weight: 500; }
+.dash-detail-artist-link { color: var(--accent); text-decoration: none; font-weight: 600; }
+.dash-detail-artist-link:hover { text-decoration: underline; }
+.dash-detail-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--accent); text-decoration: none;
+  padding: 4px 10px; border: 1px solid var(--accent); border-radius: 6px;
+  background: var(--accent-dim); transition: all var(--transition);
+}
+.dash-detail-link:hover { background: rgba(50,145,230,0.2); }
+.dash-detail-desc {
+  font-size: 12px; color: var(--text-secondary); line-height: 1.6;
+  max-height: 120px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+}
+.dash-detail-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.dash-detail-tag {
+  font-size: 11px; padding: 2px 8px; border-radius: 4px;
+  background: var(--bg-input); color: var(--text-secondary);
+}
+/* 详情面板图片网格 */
+.dash-detail-img-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+.dash-detail-img-item {
+  aspect-ratio: 3/4;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition);
+}
+.dash-detail-img-item:hover { border-color: var(--border-light); }
+.dash-detail-img-item img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.dash-detail-img-placeholder {
+  font-size: 24px; color: var(--text-muted); opacity: 0.4;
+}
+.dash-detail-img-badge {
+  position: absolute; bottom: 4px; right: 4px;
+  font-size: 10px; padding: 1px 6px; border-radius: 4px;
+  background: rgba(0,0,0,0.7); color: #fff; font-weight: 600;
+}
+
+/* ====== 多P图片查看器模态窗 ====== */
+.image-viewer-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+  z-index: 300; display: none; align-items: center; justify-content: center; flex-direction: column;
+}
+.image-viewer-overlay.active { display: flex; }
+.image-viewer-main { position: relative; display: flex; align-items: center; justify-content: center; flex: 1; width: 100%; overflow: hidden; padding: 0 60px; }
+.image-viewer-main img { max-width: 100%; max-height: 85vh; object-fit: contain; border-radius: 4px; box-shadow: 0 4px 40px rgba(0,0,0,0.6); }
+.image-viewer-nav {
+  position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #fff; font-size: 22px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all var(--transition); z-index: 10;
+}
+.image-viewer-nav:hover { background: rgba(255,255,255,0.2); }
+.image-viewer-nav.prev { left: 10px; }
+.image-viewer-nav.next { right: 10px; }
+.image-viewer-nav:disabled { opacity: 0.3; cursor: not-allowed; }
+.image-viewer-topbar { position: absolute; top: 0; left: 0; right: 0; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 10; }
+.image-viewer-title { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9); max-width: 600px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.image-viewer-page { font-size: 14px; color: rgba(255,255,255,0.7); font-weight: 600; }
+.image-viewer-close {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #fff; font-size: 18px; width: 36px; height: 36px; border-radius: 50%;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--transition);
+}
+.image-viewer-close:hover { background: rgba(255,255,255,0.25); }
+.image-viewer-copy {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #fff; font-size: 16px; width: 36px; height: 36px; border-radius: 50%;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--transition);
+  margin-left: 8px; margin-right: 8px;
+}
+.image-viewer-copy:hover { background: rgba(255,255,255,0.25); }
+.image-viewer-copy.copied { background: rgba(76,175,80,0.5); border-color: rgba(76,175,80,0.7); }
+.image-viewer-pixiv-link {
+  font-size: 12px; font-weight: 600; color: var(--accent);
+  background: rgba(50,145,230,0.2); border: 1px solid rgba(50,145,230,0.4);
+  padding: 5px 12px; border-radius: 6px; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px;
+  transition: all 0.2s; margin-left: auto;
+}
+.image-viewer-pixiv-link:hover { background: rgba(50,145,230,0.35); color: #5aa9f0; }
+.image-viewer-thumbnails { display: flex; align-items: center; gap: 6px; padding: 12px 24px; overflow-x: auto; max-width: 100%; flex-shrink: 0; }
+.image-viewer-thumbnails::-webkit-scrollbar { height: 3px; }
+.image-viewer-thumbnails::-webkit-scrollbar-track { background: transparent; }
+.image-viewer-thumbnails::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+.image-viewer-thumb {
+  width: 56px; height: 56px; border-radius: 6px; overflow: hidden; flex-shrink: 0; cursor: pointer;
+  border: 2px solid transparent; opacity: 0.5; transition: all var(--transition); background: rgba(255,255,255,0.05);
+}
+.image-viewer-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.image-viewer-thumb:hover { opacity: 0.8; border-color: rgba(255,255,255,0.3); }
+.image-viewer-thumb.active { opacity: 1; border-color: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+
+/* ====== 移动端适配 ====== */
+@media (max-width: 768px) {
+  body { overflow-x: hidden; }
+  .sidebar { display: none; }
+  .main {
+    margin-left: 0;
+    padding: 12px 12px 80px 12px;
+    max-width: 100%;
+  }
+  .page-header { margin-bottom: 16px; }
+  .page-title { font-size: 20px; }
+  .page-subtitle { font-size: 12px; }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px; margin-bottom: 20px;
+  }
+  .stat-card { padding: 14px 16px; }
+  .stat-value { font-size: 22px; }
+  .stat-icon { width: 34px; height: 34px; font-size: 16px; margin-bottom: 8px; }
+  .stat-label { font-size: 10px; }
+  .stat-sub { font-size: 10px; }
+  .quick-actions {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px; margin-bottom: 20px;
+  }
+  .action-card { padding: 12px 14px; gap: 10px; }
+  .action-card .ac-icon { width: 36px; height: 36px; font-size: 16px; border-radius: 10px; }
+  .action-card .ac-text h3 { font-size: 12px; }
+  .action-card .ac-text p { font-size: 10px; }
+  .recent-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px; padding: 8px 10px;
+  }
+  .recent-card-body { padding: 6px 8px; }
+  .recent-card-title { font-size: 11px; }
+  .recent-card-meta { font-size: 10px; }
+  /* 详情面板在手机上占满屏 */
+  .dash-right-panel { width: 100%; right: -100%; }
+  .dash-panel-header h2 { max-width: 260px; font-size: 14px; }
+  .dash-detail-img-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+  /* 图片查看器导航按钮缩小 */
+  .image-viewer-nav { width: 36px; height: 36px; font-size: 18px; }
+  .image-viewer-nav.prev { left: 4px; }
+  .image-viewer-nav.next { right: 4px; }
+  .image-viewer-topbar { padding: 10px 14px; }
+  .image-viewer-title { font-size: 12px; max-width: 200px; }
+  .image-viewer-pixiv-link { font-size: 10px; padding: 3px 8px; }
+  .image-viewer-copy { width: 30px; height: 30px; font-size: 14px; margin-left: 4px; margin-right: 4px; }
+  .image-viewer-close { width: 30px; height: 30px; font-size: 14px; }
+  .image-viewer-main { padding: 0 40px; }
+  .image-viewer-thumbnails { padding: 8px 12px; gap: 4px; }
+  .image-viewer-thumb { width: 40px; height: 40px; }
+  .filter-record { padding: 10px 14px; gap: 8px; }
+  .filter-record-title { font-size: 12px; }
+  .filter-record-meta, .filter-record-time { font-size: 10px; }
+  .filter-reason-badge { font-size: 10px; padding: 2px 7px; }
+}
+</style>
+<script src="/static/common.js"></script>
+</head>
+<body>
+
+<!-- 底部 Tab 导航栏（仅手机端显示） -->
+{% set active_tab = 'index' %}
+{% include '_mobile_nav.html' %}
+
+{% set active_nav = 'index' %}
+{% include '_sidebar.html' %}
+
+<div class="main">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">📊 仪表盘</h1>
+            <p class="page-subtitle">Pixiv 下载管理概览</p>
+        </div>
+    </div>
+
+    <!-- Cookie 状态提醒 -->
+    <div id="cookieBanner" style="display:none;align-items:center;gap:10px;background:rgba(240,160,64,0.12);border:1px solid rgba(240,160,64,0.35);color:var(--orange);border-radius:10px;padding:10px 16px;font-size:13px;margin-bottom:16px;">
+        <span>⚠️</span>
+        <span id="cookieBannerText">Cookie 可能已过期，下载功能会受限。</span>
+        <a href="/config" style="margin-left:auto;color:var(--accent);font-weight:600;text-decoration:none;white-space:nowrap;">去设置 →</a>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats-grid" id="statsGrid">
+        <div class="loading-state"><div class="spinner"></div>加载统计中...</div>
+    </div>
+
+    <!-- 快捷操作 -->
+    <h2 style="font-size:16px;font-weight:700;margin-bottom:12px;color:var(--text-primary);">快捷操作</h2>
+    <div class="quick-actions">
+        <a href="/download" class="action-card">
+            <div class="ac-icon">⬇️</div>
+            <div class="ac-text">
+                <h3>下载作品</h3>
+                <p>输入作品ID或URL下载</p>
+            </div>
+        </a>
+        <a href="/download" class="action-card">
+            <div class="ac-icon">👤</div>
+            <div class="ac-text">
+                <h3>下载作者</h3>
+                <p>下载作者全部或部分作品</p>
+            </div>
+        </a>
+        <a href="/sync" class="action-card">
+            <div class="ac-icon">🔄</div>
+            <div class="ac-text">
+                <h3>扫描同步</h3>
+                <p>扫描本地文件同步到数据库</p>
+            </div>
+        </a>
+        <a href="/sync" class="action-card">
+            <div class="ac-icon">✅</div>
+            <div class="ac-text">
+                <h3>完整性验证</h3>
+                <p>检查数据库与文件一致性</p>
+            </div>
+        </a>
+        <a href="/download" class="action-card" onclick="sessionStorage.setItem('downloadTab','tags')">
+            <div class="ac-icon">🏷️</div>
+            <div class="ac-text">
+                <h3>标签补全</h3>
+                <p>为缺标签的作品批量补全</p>
+            </div>
+        </a>
+    </div>
+
+    <!-- 最近下载 - 全宽瀑布流封面展示 -->
+    <h2 style="font-size:16px;font-weight:700;margin-bottom:12px;color:var(--text-primary);display:flex;align-items:center;gap:8px;">
+        📥 最近下载
+        <span style="font-size:12px;color:var(--text-muted);font-weight:400;" id="recentCount"></span>
+    </h2>
+    <div class="panel fade-in" style="margin-bottom:28px;">
+        <div class="panel-body" id="recentDownloadList" style="max-height:none;overflow:visible;">
+            <div class="loading-state"><div class="spinner"></div>加载中...</div>
+        </div>
+    </div>
+
+    <!-- 已过滤作品记录 -->
+    <h2 id="filterSection" style="font-size:16px;font-weight:700;margin:28px 0 12px;color:var(--text-primary);display:flex;align-items:center;gap:8px;scroll-margin-top:20px;">
+        🛡️ 已过滤作品
+        <span style="font-size:12px;color:var(--text-muted);font-weight:400;" id="filterCount"></span>
+    </h2>
+    <div class="panel fade-in" style="margin-bottom:32px;">
+        <div class="panel-body" id="filterRecordList" style="max-height:360px;">
+            <div class="loading-state"><div class="spinner"></div>加载中...</div>
+        </div>
+    </div>
+
+    <!-- 系统状态 -->
+    <h2 style="font-size:16px;font-weight:700;margin:28px 0 12px;color:var(--text-primary);">🛠️ 系统状态</h2>
+    <div class="panel fade-in" style="margin-bottom:32px;">
+        <div class="panel-body" id="systemPanel">
+            <div class="loading-state"><div class="spinner"></div>加载中...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ====== 右侧滑动详情面板 ====== -->
+<div class="dash-panel-overlay" id="dashPanelOverlay" onclick="closeDashPanel()"></div>
+<div class="dash-right-panel" id="dashRightPanel">
+    <div class="dash-panel-header">
+        <h2 id="dashPanelTitle">作品详情</h2>
+        <button class="dash-panel-close" onclick="closeDashPanel()">✕</button>
+    </div>
+    <div class="dash-panel-body" id="dashPanelBody">
+        <div class="loading-state"><div class="spinner"></div>加载中...</div>
+    </div>
+</div>
+
+<!-- ====== 多P图片查看器模态窗 ====== -->
+<div class="image-viewer-overlay" id="imageViewerOverlay">
+    <div class="image-viewer-topbar">
+        <span class="image-viewer-title" id="viewerTitle">作品标题</span>
+        <span class="image-viewer-page" id="viewerPageInfo">1 / 1</span>
+        <a class="image-viewer-pixiv-link" id="viewerPixivLink" href="#" target="_blank" rel="noopener" title="在 Pixiv 查看此作品">🔗 P站</a>
+        <button class="image-viewer-copy" id="viewerCopyBtn" onclick="copyViewerImage()" title="复制当前图片到剪贴板">📋</button>
+        <button class="image-viewer-copy" id="viewerCopyFileBtn" onclick="copyViewerImageFile()" title="复制文件本体（仅本地访问）" style="display:none;">📁</button>
+        <button class="image-viewer-close" onclick="closeImageViewer()">✕</button>
+    </div>
+    <div class="image-viewer-main">
+        <button class="image-viewer-nav prev" id="viewerPrevBtn" onclick="viewerPrev()">‹</button>
+        <img id="viewerImage" src="" alt="">
+        <button class="image-viewer-nav next" id="viewerNextBtn" onclick="viewerNext()">›</button>
+    </div>
+    <div class="image-viewer-thumbnails" id="viewerThumbnails"></div>
+</div>
+
+<script>
+function formatTime(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = now - d;
+    const mins = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (mins < 1) return '刚刚';
+    if (mins < 60) return `${mins} 分钟前`;
+    if (hours < 24) return `${hours} 小时前`;
+    if (days < 7) return `${days} 天前`;
+    return d.toLocaleDateString('zh-CN');
+}
+
+function formatSize(bytes) {
+    if (!bytes) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let i = 0, v = bytes;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+function formatDate(iso) {
+    if (!iso) return '-';
+    return new Date(iso).toLocaleDateString('zh-CN');
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ====== 最近下载瀑布流渲染 + 图片懒加载 ======
+let _recentImgObserver = null;
+const MAX_RECENT_IMG_CONCURRENT = 4;
+let _recentImgActive = 0;
+let _recentImgPending = [];
+
+function renderRecentCards(items) {
+    const recentList = document.getElementById('recentDownloadList');
+    // 清理旧的 observer
+    if (_recentImgObserver) { _recentImgObserver.disconnect(); _recentImgObserver = null; }
+    _recentImgPending = [];
+    _recentImgActive = 0;
+
+    // 先只创建 DOM 结构（含骨架屏），图片后续按需加载
+    recentList.innerHTML = `<div class="recent-grid">${items.map((r, i) => {
+        const pageCount = r.page_count || 1;
+        const dlPages = r.downloaded_pages || 0;
+        const isFull = dlPages >= pageCount;
+        const hasImg = !!r.first_image_path;
+        const hasMultiplePages = pageCount > 1;
+        return `
+        <div class="recent-card" onclick="openDashPanel(${r.work_id || 0})" title="点击查看详情">
+            <div class="recent-card-thumb" data-recent-idx="${i}">
+                ${hasImg
+                    ? '<div class="recent-card-skeleton"></div>'
+                    : '<span class="no-img">🖼️</span>'}
+                ${hasMultiplePages ? `<span class="recent-card-page-indicator">${dlPages}/${pageCount}</span>` : ''}
+            </div>
+            <div class="recent-card-body">
+                <div class="recent-card-title" title="${(r.title || '无标题').replace(/"/g, '&quot;')}">${r.title || '无标题'}</div>
+                <div class="recent-card-meta">
+                    <span class="recent-card-author" title="${(r.artist_name || '-').replace(/"/g, '&quot;')}">👤 ${r.artist_name || '-'}</span>
+                    <span class="recent-card-badge ${isFull ? 'full' : 'partial'}">${dlPages}/${pageCount}P</span>
+                </div>
+            </div>
+        </div>`;
+    }).join('')}</div>`;
+
+    // 设置 IntersectionObserver 懒加载封面原图
+    _recentImgObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const thumb = entry.target;
+                const idx = parseInt(thumb.getAttribute('data-recent-idx'));
+                const item = items[idx];
+                if (item && item.first_image_path) {
+                    _recentImgPending.push({ thumb, path: item.first_image_path });
+                    processRecentImgQueue();
+                }
+                _recentImgObserver.unobserve(thumb);
+            }
+        });
+    }, { rootMargin: '300px', threshold: 0 });
+
+    recentList.querySelectorAll('.recent-card-thumb[data-recent-idx]').forEach(el => {
+        _recentImgObserver.observe(el);
+    });
+}
+
+function processRecentImgQueue() {
+    while (_recentImgActive < MAX_RECENT_IMG_CONCURRENT && _recentImgPending.length > 0) {
+        const { thumb, path } = _recentImgPending.shift();
+        _recentImgActive++;
+        loadRecentCardImage(thumb, path);
+    }
+}
+
+function onRecentImgDone() {
+    _recentImgActive--;
+    processRecentImgQueue();
+}
+
+function loadRecentCardImage(thumbEl, filePath) {
+    const skeleton = thumbEl.querySelector('.recent-card-skeleton');
+    const img = document.createElement('img');
+    img.alt = '';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+
+    img.onload = function() {
+        if (skeleton) skeleton.remove();
+        img.classList.add('loaded');
+        onRecentImgDone();
+    };
+    img.onerror = function() {
+        if (skeleton) {
+            skeleton.className = 'no-img';
+            skeleton.innerHTML = '';
+            skeleton.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--text-muted);opacity:0.25;background:var(--bg-primary);';
+            const span = document.createElement('span');
+            span.textContent = '🖼️';
+            skeleton.appendChild(span);
+        }
+        img.remove();
+        onRecentImgDone();
+    };
+
+    img.src = '/thumbnail/' + encodeURIComponent(filePath);
+    thumbEl.insertBefore(img, thumbEl.firstChild);
+}
+
+async function loadDashboard() {
+    try {
+        const resp = await fetch('/api/dashboard');
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error);
+        const d = data.data;
+
+        // Cookie 状态横幅
+        const cs = d.cookie_status || {};
+        window._cookieStatus = cs;
+        const banner = document.getElementById('cookieBanner');
+        if (cs.invalid || !cs.has) {
+            banner.style.display = 'flex';
+            document.getElementById('cookieBannerText').textContent =
+                cs.invalid
+                    ? '最近请求遇到 403：Cookie 可能已过期或失效，下载功能会受限。'
+                    : '尚未设置 Cookie，下载功能将不可用。';
+        } else {
+            banner.style.display = 'none';
+        }
+
+        // 系统状态面板（同步历史 / 访问模式 / 缓存维护）
+        renderSystemPanel();
+
+        // 统计卡片
+        const s = d.stats;
+        const grid = document.getElementById('statsGrid');
+        const clickable = 'cursor:pointer;transition:all var(--transition);';
+        const hoverStyle = 'onmouseenter="this.style.borderColor=\'var(--accent)\';this.style.transform=\'translateY(-2px)\';" onmouseleave="this.style.borderColor=\'\';this.style.transform=\'\';"';
+        grid.innerHTML = `
+            <div class="stat-card fade-in" style="${clickable}" title="查看作者列表" onclick="location.href='/artists'" ${hoverStyle}>
+                <div class="stat-icon blue">👤</div>
+                <div class="stat-label">作者总数</div>
+                <div class="stat-value accent">${s.artists}</div>
+            </div>
+            <div class="stat-card fade-in" style="${clickable}" title="浏览图片" onclick="location.href='/images'" ${hoverStyle}>
+                <div class="stat-icon purple">🖼️</div>
+                <div class="stat-label">作品总数</div>
+                <div class="stat-value accent">${s.works}</div>
+            </div>
+            <div class="stat-card fade-in" style="${clickable}" title="浏览图片" onclick="location.href='/images'" ${hoverStyle}>
+                <div class="stat-icon green">📸</div>
+                <div class="stat-label">图片总数</div>
+                <div class="stat-value accent">${s.images}</div>
+                <div class="stat-sub">总大小 ${s.total_size_mb} MB</div>
+            </div>
+            <div class="stat-card fade-in" style="${clickable}" title="前往下载管理" onclick="location.href='/download'" ${hoverStyle}>
+                <div class="stat-icon orange">⏳</div>
+                <div class="stat-label">待处理任务</div>
+                <div class="stat-value">${s.pending_tasks}</div>
+            </div>
+            <div class="stat-card fade-in" style="${clickable}" title="前往下载管理" onclick="location.href='/download'" ${hoverStyle}>
+                <div class="stat-icon ${s.failed_tasks > 0 ? 'red' : 'green'}">${s.failed_tasks > 0 ? '❌' : '✅'}</div>
+                <div class="stat-label">失败任务</div>
+                <div class="stat-value" style="color:${s.failed_tasks > 0 ? 'var(--red)' : 'var(--green)'}">${s.failed_tasks}</div>
+            </div>
+            <div class="stat-card fade-in" style="${clickable}" title="查看下方被过滤作品列表" onclick="document.getElementById('filterSection').scrollIntoView({behavior:'smooth'})" ${hoverStyle}>
+                <div class="stat-icon purple">🛡️</div>
+                <div class="stat-label">已过滤作品</div>
+                <div class="stat-value accent">${d.filter_stats ? d.filter_stats.total_filtered : 0}</div>
+                <div class="stat-sub">自动跳过AI批量作品</div>
+            </div>
+        `;
+
+        // 最近下载（瀑布流封面展示）
+        const recent = d.recent_downloads || [];
+        document.getElementById('recentCount').textContent = recent.length > 0 ? `最近 ${recent.length} 个作品` : '';
+        const recentList = document.getElementById('recentDownloadList');
+        if (recent.length === 0) {
+            recentList.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>暂无下载记录</p></div>';
+        } else {
+            // 分批渲染 DOM 卡片，避免长任务卡顿
+            renderRecentCards(recent);
+        }
+
+        // 已过滤作品记录
+        try {
+            const fr = await fetch('/api/filter/records');
+            const fd = await fr.json();
+            if (fd.success) {
+                const records = fd.data || [];
+                document.getElementById('filterCount').textContent = records.length > 0 ? `最近 ${records.length} 条` : '';
+                const filterList = document.getElementById('filterRecordList');
+                if (records.length === 0) {
+                    filterList.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>暂无过滤记录</p></div>';
+                } else {
+                    filterList.innerHTML = records.map(r => {
+                        const reasonShort = r.filter_reason && r.filter_reason.length > 30
+                            ? r.filter_reason.substring(0, 30) + '...' : (r.filter_reason || '');
+                        return `
+                        <div class="filter-record">
+                            <button onclick="retryFilteredWork(${r.work_id})" title="跳过过滤，重新下载该作品"
+                                    style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:5px;font-size:11px;padding:2px 9px;cursor:pointer;flex-shrink:0;">⬇️ 重下</button>
+                            <span class="filter-reason-badge">已过滤</span>
+                            <div class="filter-record-info">
+                                <div class="filter-record-title" title="${r.title || ''}">${r.title || '无标题'} <span style="font-weight:400;color:var(--text-muted);">(ID:${r.work_id})</span></div>
+                                <div class="filter-record-meta">
+                                    ${r.artist_name ? r.artist_name + ' · ' : ''}${r.page_count || 0}页 · ${reasonShort}
+                                </div>
+                            </div>
+                            <div class="filter-record-time">${formatTime(r.created_at)}</div>
+                        </div>`;
+                    }).join('');
+                }
+            }
+        } catch(e) {
+            console.error('加载过滤记录失败:', e);
+        }
+
+    } catch(e) {
+        document.getElementById('statsGrid').innerHTML = `<div class="error-msg">加载失败: ${e.message}</div>`;
+    }
+}
+
+// ====== 系统状态面板 ======
+async function renderSystemPanel() {
+    const el = document.getElementById('systemPanel');
+    if (!el) return;
+
+    // 访问模式
+    const isLocal = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+
+    // Cookie 状态（loadDashboard 已缓存到 window._cookieStatus，兜底再查一次）
+    let cs = window._cookieStatus;
+    if (!cs) {
+        try {
+            const r = await fetch('/api/config');
+            const d = await r.json();
+            cs = d.success ? { has: d.data.has_cookie, invalid: false } : { has: false, invalid: false };
+        } catch(e) { cs = { has: false, invalid: false }; }
+    }
+    const cookiePill = cs.invalid
+        ? '<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:12px;background:var(--red-dim);color:var(--red);font-weight:600;">⚠️ Cookie 已失效</span>'
+        : cs.has
+            ? '<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:12px;background:var(--green-dim);color:var(--green);font-weight:600;">🔑 Cookie 已设置</span>'
+            : '<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:12px;background:var(--orange-dim);color:var(--orange);font-weight:600;">⚠️ Cookie 未设置</span>';
+
+    const modePill = isLocal
+        ? '<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:12px;background:var(--accent-dim);color:var(--accent);font-weight:600;">🖥️ 本机访问</span>'
+        : '<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:12px;background:var(--purple-dim);color:var(--purple);font-weight:600;">🌐 局域网访问</span>';
+
+    // 同步历史
+    let historyHtml = '';
+    try {
+        const r = await fetch('/api/sync/history');
+        const d = await r.json();
+        const records = (d.success && d.data) ? d.data : [];
+        const typeLabel = { 'incremental_scan': '⚡ 增量扫描', 'full_scan': '📂 全量扫描' };
+        if (records.length === 0) {
+            historyHtml = '<div style="font-size:12px;color:var(--text-muted);">暂无同步记录 · <a href="/sync" style="color:var(--accent);">去扫描</a></div>';
+        } else {
+            historyHtml = records.slice(0, 8).map(rec => {
+                const label = typeLabel[rec.sync_type] || rec.sync_type;
+                const summary = rec.items_added > 0 ? `新增 ${rec.items_added} 条` : (rec.items_found > 0 ? `共 ${rec.items_found} 文件(无新增)` : '无变化');
+                const time = (rec.created_at || '').replace('T', ' ').substring(0, 16);
+                return `<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 10px;border-radius:6px;background:var(--bg-input);margin-bottom:6px;font-size:12px;">
+                    <span style="color:var(--text-secondary);">${label} · ${summary}</span>
+                    <span style="color:var(--text-muted);flex-shrink:0;">${time}</span>
+                </div>`;
+            }).join('');
+        }
+    } catch(e) {
+        historyHtml = '<div style="font-size:12px;color:var(--text-muted);">同步历史加载失败</div>';
+    }
+
+    el.innerHTML = `
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:14px;">
+            ${modePill}
+            ${cookiePill}
+            <button class="btn btn-outline btn-sm" onclick="cleanupThumbs()" style="margin-left:auto;">🧹 清理缩略图缓存</button>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">📅 最近同步记录</div>
+        ${historyHtml}
+    `;
+}
+
+async function cleanupThumbs() {
+    if (!confirm('确定清理全部缩略图缓存吗？下次浏览图片时会重新生成。')) return;
+    try {
+        const r = await fetch('/api/maintenance/cleanup-thumbs', { method: 'POST' });
+        const d = await r.json();
+        if (d.success) showToast(d.message || '清理完成', 'success');
+        else showToast(d.error || '清理失败', 'error');
+        renderSystemPanel();
+    } catch(e) {
+        showToast('清理失败: ' + e.message, 'error');
+    }
+}
+
+async function retryFilteredWork(workId) {
+    if (!confirm(`为被过滤的作品 ${workId} 重新下载？将跳过 AI 过滤并重新获取。`)) return;
+    try {
+        const resp = await fetch('/api/download/work', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ work_id: String(workId), force: true })
+        });
+        const d = await resp.json();
+        if (d.success) showToast('已加入下载队列', 'success');
+        else showToast(d.error || '提交失败', 'error');
+    } catch(e) {
+        showToast(e.message, 'error');
+    }
+}
+
+// ====== 右侧滑动详情面板 ======
+async function openDashPanel(workId) {
+    if (!workId) return;
+    const panel = document.getElementById('dashRightPanel');
+    const overlay = document.getElementById('dashPanelOverlay');
+    const body = document.getElementById('dashPanelBody');
+    document.getElementById('dashPanelTitle').textContent = '加载中...';
+    body.innerHTML = '<div class="loading-state"><div class="spinner"></div>加载中...</div>';
+    panel.classList.add('open');
+    overlay.classList.add('active');
+
+    try {
+        const resp = await fetch(`/api/work/${workId}/detail`);
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error);
+        renderDashDetail(data.data, workId);
+    } catch(e) {
+        body.innerHTML = `<div class="error-msg">加载失败: ${e.message}</div>`;
+    }
+}
+
+function renderDashDetail(work, workId) {
+    const images = work.images || [];
+    const downloadedCount = images.filter(im => im.is_downloaded).length;
+    const totalCount = images.length || work.page_count || 1;
+    const isComplete = downloadedCount >= totalCount;
+    const artistId = work.artist?.id;
+    const artistName = work.artist?.name || '-';
+    const artistAccount = work.artist?.account || '';
+    const desc = work.description || '';
+
+    document.getElementById('dashPanelTitle').textContent = (work.title || '无标题').substring(0, 40) + ((work.title || '').length > 40 ? '...' : '');
+
+    const html = `
+        <div class="dash-detail-section">
+            <div class="dash-detail-section-title">📋 基本信息</div>
+            <div class="dash-detail-info-row"><span class="dash-detail-info-label">作品ID</span><span class="dash-detail-info-value">${workId}</span></div>
+            <div class="dash-detail-info-row"><span class="dash-detail-info-label">作者</span><span class="dash-detail-info-value">${artistId ? `<a class="dash-detail-artist-link" href="/artists" onclick="sessionStorage.setItem('gotoArtist','${artistId}');">${artistName}</a>` : artistName}</span></div>
+            <div class="dash-detail-info-row"><span class="dash-detail-info-label">页数</span><span class="dash-detail-info-value">${totalCount}P</span></div>
+            <div class="dash-detail-info-row"><span class="dash-detail-info-label">下载状态</span><span class="dash-detail-info-value">${isComplete ? '✅ 已下载' : downloadedCount > 0 ? `⏳ ${downloadedCount}/${totalCount}P` : '✗ 未下载'}</span></div>
+            ${work.width && work.height ? `<div class="dash-detail-info-row"><span class="dash-detail-info-label">尺寸</span><span class="dash-detail-info-value">${work.width} × ${work.height}</span></div>` : ''}
+            <div class="dash-detail-info-row"><span class="dash-detail-info-label">创建时间</span><span class="dash-detail-info-value">${formatDate(work.created_at)}</span></div>
+        </div>
+        ${work.tags && work.tags.length > 0 ? `<div class="dash-detail-section"><div class="dash-detail-section-title">🏷️ 标签 (${work.tags.length})</div><div class="dash-detail-tags">${work.tags.map(t => `<span class="dash-detail-tag">${escapeHtml(t)}</span>`).join('')}</div></div>` : ''}
+        <div class="dash-detail-section">
+            <a class="dash-detail-link" href="https://www.pixiv.net/artworks/${workId}" target="_blank" rel="noopener">🔗 在 Pixiv 查看</a>
+            ${artistId ? `<a class="dash-detail-link" href="/artists" onclick="sessionStorage.setItem('gotoArtist','${artistId}');" style="margin-left:8px;">👤 本地作者页</a>` : ''}
+            ${artistId ? `<a class="dash-detail-link" href="https://www.pixiv.net/users/${artistId}" target="_blank" rel="noopener" style="margin-left:8px;">🌐 P站作者页</a>` : ''}
+        </div>
+        ${desc ? `<div class="dash-detail-section"><div class="dash-detail-section-title">📝 作品描述</div><div class="dash-detail-desc">${escapeHtml(desc)}</div></div>` : ''}
+        <div class="dash-detail-section">
+            <div class="dash-detail-section-title">🖼️ 图片列表 (${totalCount}张)</div>
+            <div class="dash-detail-img-grid">
+                ${images.length > 0 ? images.map((img, i) => {
+                    const src = img.file_path ? `/thumbnail/${encodeURIComponent(img.file_path)}` : '';
+                    return `<div class="dash-detail-img-item" onclick="openDashImageViewer(${workId}, ${i})" title="点击查看大图">
+                        ${src ? `<img src="${src}" alt="" onload="this.style.opacity='1'" onerror="this.style.display='none';var ph=this.parentElement.querySelector('.dash-detail-img-placeholder');if(ph)ph.style.display=''"
+                              style="opacity:0;transition:opacity 0.3s ease"><span class="dash-detail-img-placeholder" style="display:none">🖼️</span>`
+                              : '<span class="dash-detail-img-placeholder">🖼️</span>'}
+                        <span class="dash-detail-img-badge">${img.is_downloaded ? '✓' : '✗'} #${img.page || (i+1)}</span>
+                    </div>`;
+                }).join('') : `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">
+                    尚未下载，请先下载此作品<br>
+                    <a href="https://www.pixiv.net/artworks/${workId}" target="_blank" rel="noopener" style="color:var(--accent);">🔗 在Pixiv查看</a>
+                </div>`}
+            </div>
+        </div>
+    `;
+
+    document.getElementById('dashPanelBody').innerHTML = html;
+}
+
+function closeDashPanel() {
+    document.getElementById('dashRightPanel').classList.remove('open');
+    document.getElementById('dashPanelOverlay').classList.remove('active');
+}
+
+// ====== 多P图片查看器 ======
+let viewerImages = [];
+let viewerCurrentIdx = 0;
+let viewerWorkTitle = '';
+let viewerWorkId = null;
+
+function openDashImageViewer(workId, startIdx) {
+    // 从详情面板 DOM 中获取所有图片信息
+    const panelBody = document.getElementById('dashPanelBody');
+    const items = panelBody.querySelectorAll('.dash-detail-img-item');
+    const images = [];
+    items.forEach((item, i) => {
+        const imgEl = item.querySelector('img');
+        let filePath = null;
+        if (imgEl && imgEl.src) {
+            const m = imgEl.src.match(/\/(?:original|thumbnail)\/(.+)$/);
+            if (m) filePath = decodeURIComponent(m[1]);
+        }
+        const badge = item.querySelector('.dash-detail-img-badge');
+        images.push({
+            page: i + 1,
+            file_path: filePath,
+            is_downloaded: badge ? badge.textContent.trim().startsWith('✓') : false,
+        });
+    });
+    // 获取标题
+    const title = document.getElementById('dashPanelTitle').textContent || '';
+    openImageViewer(images, startIdx, title, workId);
+}
+
+function openImageViewer(images, startIdx, title, workId) {
+    viewerImages = images.filter(im => im.file_path); // 只显示有文件路径的
+    if (viewerImages.length === 0) return;
+    viewerCurrentIdx = Math.max(0, Math.min(startIdx, viewerImages.length - 1));
+    viewerWorkTitle = title || '';
+    viewerWorkId = workId || null;
+
+    document.getElementById('viewerTitle').textContent = viewerWorkTitle;
+    document.getElementById('viewerPixivLink').href = workId ? `https://www.pixiv.net/artworks/${workId}` : '#';
+    document.getElementById('imageViewerOverlay').classList.add('active');
+    showViewerImage();
+    renderViewerThumbnails();
+
+    // 绑定键盘事件
+    document.addEventListener('keydown', viewerKeyHandler);
+}
+
+function closeImageViewer() {
+    document.getElementById('imageViewerOverlay').classList.remove('active');
+    document.removeEventListener('keydown', viewerKeyHandler);
+    viewerImages = [];
+    viewerCurrentIdx = 0;
+}
+
+function showViewerImage() {
+    const img = viewerImages[viewerCurrentIdx];
+    if (!img) return;
+    const imgEl = document.getElementById('viewerImage');
+    imgEl.src = img.file_path ? `/original/${encodeURIComponent(img.file_path)}` : '';
+    document.getElementById('viewerPageInfo').textContent = `${viewerCurrentIdx + 1} / ${viewerImages.length}`;
+
+    document.getElementById('viewerPrevBtn').disabled = viewerCurrentIdx === 0;
+    document.getElementById('viewerNextBtn').disabled = viewerCurrentIdx >= viewerImages.length - 1;
+
+    const thumbs = document.querySelectorAll('#viewerThumbnails .image-viewer-thumb');
+    thumbs.forEach((t, i) => t.classList.toggle('active', i === viewerCurrentIdx));
+}
+
+function viewerPrev() {
+    if (viewerCurrentIdx > 0) { viewerCurrentIdx--; showViewerImage(); }
+}
+
+function viewerNext() {
+    if (viewerCurrentIdx < viewerImages.length - 1) { viewerCurrentIdx++; showViewerImage(); }
+}
+
+function viewerGoTo(idx) {
+    if (idx >= 0 && idx < viewerImages.length) { viewerCurrentIdx = idx; showViewerImage(); }
+}
+
+function renderViewerThumbnails() {
+    const container = document.getElementById('viewerThumbnails');
+    container.innerHTML = viewerImages.map((img, i) => `
+        <div class="image-viewer-thumb ${i === viewerCurrentIdx ? 'active' : ''}" onclick="viewerGoTo(${i})">
+            ${img.file_path
+                ? `<img src="/thumbnail/${encodeURIComponent(img.file_path)}" alt="第${img.page || i + 1}页" onerror="this.parentElement.style.display='none'">`
+                : `<span style="font-size:20px;display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:var(--text-muted);">🖼️</span>`}
+        </div>
+    `).join('');
+}
+
+async function copyViewerImage() {
+    const img = viewerImages[viewerCurrentIdx];
+    if (!img || !img.file_path) {
+        showToast('当前图片无本地文件，无法复制', 'error');
+        return;
+    }
+    const btn = document.getElementById('viewerCopyBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳';
+    try {
+        let fp = img.file_path;
+        const idx = fp.indexOf('/original/');
+        if (idx >= 0) fp = decodeURIComponent(fp.substring(idx + '/original/'.length));
+
+        // 直接 fetch 原图，拿到原始格式 blob（保持原格式原质量，本地/局域网均最优）
+        const resp = await fetch('/original/' + encodeURIComponent(fp));
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        const mime = blob.type || 'image/png';
+        await navigator.clipboard.write([new ClipboardItem({ [mime]: blob })]);
+
+        btn.classList.add('copied');
+        btn.textContent = '✅';
+    } catch(e) {
+        btn.textContent = '❌';
+        console.error('复制失败:', e);
+    }
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('copied'); btn.textContent = '📋'; }, 1400);
+}
+
+async function copyViewerImageFile() {
+    const img = viewerImages[viewerCurrentIdx];
+    if (!img || !img.file_path) {
+        showToast('当前图片无本地文件，无法复制', 'error');
+        return;
+    }
+    let fp = img.file_path;
+    const idx = fp.indexOf('/original/');
+    if (idx >= 0) fp = decodeURIComponent(fp.substring(idx + '/original/'.length));
+
+    const btn = document.getElementById('viewerCopyFileBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳';
+    try {
+        const r = await fetch('/api/image/copy-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file_path: fp })
+        });
+        const d = await r.json();
+        if (d.success) {
+            btn.classList.add('copied');
+            btn.textContent = '✅';   // 成功：图标即时反馈，不弹窗
+        } else {
+            btn.textContent = '❌';
+            console.error('复制文件失败:', d.error);
+        }
+    } catch (e) {
+        btn.textContent = '❌';
+        console.error('复制文件失败:', e.message);
+    }
+    setTimeout(() => { btn.disabled = false; btn.classList.remove('copied'); btn.textContent = '📁'; }, 1400);
+}
+
+function viewerKeyHandler(e) {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); viewerPrev(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); viewerNext(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeImageViewer(); }
+}
+
+loadDashboard();
+if (isLocalHost()) document.getElementById('viewerCopyFileBtn').style.display = '';
+</script>
+</body>
+</html>

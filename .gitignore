@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 敏感配置与 Cookie（含登录凭证，绝不提交）
+config.json
+cookies*.txt
+cookie.txt
+
+# 数据库
+*.db
+*.db-wal
+*.db-shm
+
+# 运行时缓存
+.thumb/
+logs/
+*.log

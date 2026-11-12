@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixiv Downloader - 下载管理</title>
+<link rel="stylesheet" href="/static/base.css">
+<style>
+/* ====== 侧边栏（与 index.html 一致） ====== */
+.sidebar {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 230px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  padding: 24px 0;
+  z-index: 100;
+  display: flex; flex-direction: column;
+}
+.main { margin-left: 230px; padding: 28px 36px; max-width: 1300px; }
+.page-title { font-size: 26px; font-weight: 800; margin-bottom: 24px; color: var(--text-primary); letter-spacing: -0.5px; }
+
+/* 标签切换 */
+.tabs { display: flex; gap: 4px; margin-bottom: 24px; background: var(--bg-card); border-radius: var(--radius-sm); padding: 4px; width: fit-content; }
+.tab { padding: 8px 20px; border-radius: var(--radius-xs); font-size: 14px; font-weight: 500; cursor: pointer; color: var(--text-secondary); transition: all var(--transition); border: none; background: transparent; }
+.tab.active { background: var(--accent); color: #fff; }
+.tab:hover:not(.active) { color: var(--text-primary); }
+
+/* 表单区域 */
+.form-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; }
+.form-section h2 { font-size: 16px; margin-bottom: 16px; color: var(--text-primary); }
+.form-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group label { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+.form-input { padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-xs); color: var(--text-primary); font-size: 14px; outline: none; min-width: 240px; transition: border-color var(--transition); }
+.form-input:focus { border-color: var(--accent); }
+.form-input::placeholder { color: var(--text-muted); }
+.form-input.small { min-width: 100px; width: 120px; }
+.checkbox-group { display: flex; align-items: center; gap: 8px; padding-top: 22px; }
+.checkbox-group input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+.checkbox-group label { font-size: 14px; color: var(--text-secondary); cursor: pointer; }
+.btn { padding: 10px 24px; border: none; border-radius: var(--radius-xs); font-size: 14px; font-weight: 600; cursor: pointer; transition: all var(--transition); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #287dc4; }
+.btn-primary:disabled { background: var(--bg-card); color: var(--text-muted); cursor: not-allowed; border: 1px solid var(--border); }
+.btn-warning { background: var(--orange); color: #fff; }
+.btn-warning:hover { background: #d08a28; }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-danger:hover { background: #d0323e; }
+.btn-success { background: var(--green); color: #fff; }
+.btn-success:hover { background: #009a63; }
+.btn-outline { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-outline:hover { color: var(--text-primary); border-color: var(--border-light); }
+.btn-sm { padding: 6px 14px; font-size: 12px; }
+
+/* ========== 任务队列区域 ========== */
+.task-queue-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; }
+.task-queue-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.task-queue-header h3 { font-size: 15px; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.task-queue-header .queue-count { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+.task-queue-list { padding: 0; }
+
+/* 单个任务卡片 */
+.task-card { padding: 16px 20px; border-bottom: 1px solid var(--bg-card-hover); transition: background var(--transition); }
+.task-card:last-child { border-bottom: none; border-radius: 0 0 var(--radius) var(--radius); }
+.task-card:hover { background: rgba(255,255,255,0.02); }
+.task-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.task-card-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.task-card-title .task-type-badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--accent-dim); color: var(--accent); }
+.task-card-title .task-type-badge.artist { background: var(--green-dim); color: var(--green); }
+.task-card-title .task-type-badge.bookmarks { background: var(--orange-dim); color: var(--orange); }
+.task-card-title .task-type-badge.sync { background: rgba(139,152,165,0.15); color: var(--text-muted); }
+.task-card-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.task-card-actions { display: flex; gap: 8px; }
+.task-card-actions .btn { padding: 5px 12px; font-size: 12px; }
+
+/* 状态指示器 */
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.status-dot.running { background: var(--green); animation: pulse 1.5s infinite; }
+.status-dot.pending { background: var(--orange); }
+.status-dot.paused { background: var(--orange); animation: pulse 2s infinite; }
+.status-dot.completed { background: var(--green); }
+.status-dot.failed { background: var(--red); }
+.status-dot.cancelled { background: var(--text-muted); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.status-text { font-size: 12px; font-weight: 600; }
+.status-text.running { color: var(--green); }
+.status-text.pending { color: var(--orange); }
+.status-text.paused { color: var(--orange); }
+.status-text.completed { color: var(--green); }
+.status-text.failed { color: var(--red); }
+.status-text.cancelled { color: var(--text-muted); }
+
+/* 任务内嵌进度条 */
+.task-progress { margin-top: 8px; }
+.task-progress-bar { width: 100%; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 4px; }
+.task-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; width: 0%; }
+.task-progress-text { font-size: 11px; color: var(--text-secondary); }
+
+/* 进度条（当前活动任务） */
+.progress-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; display: none; }
+.progress-section.active { display: block; }
+.progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.progress-header .title { font-size: 16px; font-weight: 600; }
+.progress-header .percent { font-size: 24px; font-weight: 700; color: var(--accent); }
+.progress-bar-bg { width: 100%; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+.progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); border-radius: 4px; transition: width 0.3s; width: 0%; }
+.progress-message { font-size: 13px; color: var(--text-secondary); }
+
+/* 日志窗口 */
+.log-section { background: #0a0d12; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; }
+.log-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.log-header h3 { font-size: 14px; color: var(--text-secondary); }
+.log-content { max-height: 400px; overflow-y: auto; padding: 12px 16px; font-family: 'Consolas', 'SF Mono', 'Monaco', monospace; font-size: 13px; line-height: 1.6; }
+.log-content::-webkit-scrollbar { width: 4px; }
+.log-content::-webkit-scrollbar-track { background: transparent; }
+.log-content::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+.log-content .log-line { padding: 2px 0; }
+.log-content .log-info { color: var(--text-secondary); }
+.log-content .log-success { color: var(--green); }
+.log-content .log-error { color: var(--red); }
+.log-content .log-progress { color: var(--accent); }
+.log-content .log-warn { color: var(--orange); }
+
+/* 缩略图预览 */
+.preview-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; display: none; }
+.preview-section.active { display: block; }
+.preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.preview-item { background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-xs); overflow: hidden; }
+.preview-item .img-wrap { width: 100%; aspect-ratio: 3/4; display: flex; align-items: center; justify-content: center; background: var(--bg-primary); overflow: hidden; }
+.preview-item .img-wrap img { width: 100%; height: 100%; object-fit: cover; }
+.preview-item .img-wrap .no-img { color: var(--text-muted); font-size: 32px; }
+.preview-item .img-info { padding: 8px 10px; font-size: 11px; color: var(--text-muted); }
+.preview-item .img-info .name { color: var(--text-secondary); font-weight: 600; margin-bottom: 2px; }
+
+/* 统计结果 */
+.result-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; display: none; }
+.result-section.active { display: block; }
+.result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.result-item { text-align: center; padding: 16px; background: rgba(255,255,255,0.03); border-radius: var(--radius-xs); }
+.result-item .val { font-size: 28px; font-weight: 700; color: var(--accent); }
+.result-item .lbl { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+
+.loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+.spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error { color: var(--red); padding: 12px; }
+
+/* 空队列 */
+.empty-queue { padding: 32px; text-align: center; color: var(--text-muted); font-size: 14px; }
+.empty-queue .icon { font-size: 36px; margin-bottom: 8px; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.4s ease-out; }
+/* ====== 手机端适配 ====== */
+@media (max-width: 768px) {
+  .main { margin-left: 0; padding: 12px 12px 80px; max-width: 100%; }
+  .page-title { font-size: 20px; }
+
+  /* 任务类型 Tab：横向滚动，避免挤压换行 */
+  .tabs {
+    width: 100%; overflow-x: auto; flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 0 0 auto; padding: 8px 14px; font-size: 13px; white-space: nowrap; }
+
+  /* 表单：单列铺满（16px 防止 iOS 聚焦自动放大） */
+  .form-section { padding: 16px; }
+  .form-row { flex-direction: column; align-items: stretch; gap: 12px; }
+  .form-group { width: 100%; }
+  .checkbox-group { padding-top: 0; }
+  .form-input { min-width: 0; width: 100%; font-size: 16px; }
+  .form-input.small { width: 100%; }
+
+  /* 按钮加大点按区域 */
+  .btn { min-height: 42px; }
+
+  /* 任务队列卡片 */
+  .task-queue-section { padding: 14px; }
+  .task-queue-header { flex-wrap: wrap; gap: 8px; }
+  .task-card { padding: 14px; }
+  .task-card-header { flex-wrap: wrap; gap: 6px; }
+  .task-card-meta { font-size: 11px; }
+  .task-card-actions { flex-wrap: wrap; gap: 8px; }
+  .task-card-actions .btn { flex: 1 1 auto; }
+
+  /* 预览网格 */
+  .preview-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+  .preview-item .img-info { padding: 6px 8px; font-size: 10px; }
+
+  /* 结果统计 */
+  .result-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .result-item { padding: 12px 8px; }
+  .result-item .val { font-size: 22px; }
+
+  /* 进度与日志 */
+  .progress-header { flex-wrap: wrap; gap: 6px; }
+  .log-content { max-height: 240px; font-size: 11px; padding: 10px 12px; }
+}
+</style>
+<script src="/static/common.js"></script>
+</head>
+<body>
+
+{% set active_tab = 'download' %}
+{% include '_mobile_nav.html' %}
+
+{% set active_nav = 'download' %}
+{% include '_sidebar.html' %}
+
+<div class="main">
+    <h1 class="page-title">⬇️ 下载管理</h1>
+
+    <!-- 标签切换 -->
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('work')">📄 单个作品</button>
+        <button class="tab" onclick="switchTab('artist')">👤 作者作品</button>
+        <button class="tab" onclick="switchTab('artist-new')">🆕 增量下载</button>
+        <button class="tab" onclick="switchTab('bookmarks')">⭐ 收藏作品</button>
+        <button class="tab" onclick="switchTab('url')">🔗 通过URL</button>
+        <button class="tab" onclick="switchTab('tags')">🏷️ 标签补全</button>
+    </div>
+
+    <!-- ========== 任务队列 ========== -->
+    <div class="task-queue-section" id="taskQueueSection">
+        <div class="task-queue-header">
+            <h3>📋 任务队列 <span class="queue-count" id="queueCount"></span></h3>
+            <div style="display:flex;gap:10px;align-items:center;">
+                <span id="failedCount" style="font-size:12px;color:var(--red);display:none;"></span>
+                <button class="btn btn-warning btn-sm" id="btnRetryFailed" style="display:none;" onclick="retryFailed()">🔄 重试失败</button>
+                <button class="btn btn-outline btn-sm" onclick="clearTaskHistory()" title="清除已取消/已完成的旧任务记录">🗑 清空历史</button>
+            </div>
+        </div>
+        <div class="task-queue-list" id="taskQueueList">
+            <div class="empty-queue">
+                <div class="icon">📭</div>
+                <div>暂无任务，提交一个下载任务开始吧</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 单个作品下载表单 -->
+    <div class="form-section" id="formWork">
+        <h2>📄 下载单个作品</h2>
+        <div class="form-row">
+            <div class="form-group">
+                <label>作品ID</label>
+                <input type="text" class="form-input" id="workId" placeholder="例如: 12345678">
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="forceWork">
+                <label for="forceWork">强制覆盖</label>
+            </div>
+            <button class="btn btn-primary" id="btnDownloadWork" onclick="downloadWork()">⬇️ 加入队列</button>
+        </div>
+    </div>
+
+    <!-- 作者作品下载表单 -->
+    <div class="form-section" id="formArtist" style="display:none;">
+        <h2>👤 下载作者作品</h2>
+        <div class="form-row">
+            <div class="form-group">
+                <label>作者ID</label>
+                <input type="text" class="form-input" id="artistId" placeholder="例如: 9645567">
+            </div>
+            <div class="form-group">
+                <label>数量限制</label>
+                <input type="number" class="form-input small" id="artistLimit" placeholder="全部" value="0" min="0">
+                <span style="font-size:11px;color:#536471;margin-top:2px;">0 = 全部</span>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="forceArtist">
+                <label for="forceArtist">强制覆盖</label>
+            </div>
+            <button class="btn btn-primary" id="btnDownloadArtist" onclick="downloadArtist()">⬇️ 加入队列</button>
+        </div>
+    </div>
+
+    <!-- 增量下载表单 -->
+    <div class="form-section" id="formArtistNew" style="display:none;">
+        <h2>🆕 增量下载作者新作品</h2>
+        <p style="font-size:13px;color:#8b98a5;margin-bottom:16px;">对比数据库中已有作品，只下载作者发布的新作品</p>
+        <div class="form-row">
+            <div class="form-group">
+                <label>作者ID</label>
+                <input type="text" class="form-input" id="artistNewId" placeholder="例如: 9645567">
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="forceArtistNew">
+                <label for="forceArtistNew">强制覆盖</label>
+            </div>
+            <button class="btn btn-primary" id="btnDownloadArtistNew" onclick="downloadArtistNew()">⬇️ 加入队列</button>
+        </div>
+    </div>
+
+    <!-- 收藏下载表单 -->
+    <div class="form-section" id="formBookmarks" style="display:none;">
+        <h2>⭐ 下载收藏作品</h2>
+        <p style="font-size:13px;color:#8b98a5;margin-bottom:16px;">下载你的 Pixiv 书签（收藏）作品</p>
+        <div class="form-row">
+            <div class="form-group">
+                <label>收藏类型</label>
+                <select class="form-input" id="bookmarkRest" style="min-width:140px;">
+                    <option value="show">公开收藏</option>
+                    <option value="hide">私密收藏</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>数量限制</label>
+                <input type="number" class="form-input small" id="bookmarkLimit" placeholder="全部" value="0" min="0">
+                <span style="font-size:11px;color:#536471;margin-top:2px;">0 = 全部</span>
+            </div>
+            <div class="form-group">
+                <label>翻页限制</label>
+                <input type="number" class="form-input small" id="bookmarkMaxPages" placeholder="全部" value="0" min="0">
+                <span style="font-size:11px;color:#536471;margin-top:2px;">0 = 全部</span>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="forceBookmark">
+                <label for="forceBookmark">强制覆盖</label>
+            </div>
+            <button class="btn btn-primary" id="btnDownloadBookmark" onclick="downloadBookmarks()">⬇️ 加入队列</button>
+        </div>
+    </div>
+
+    <!-- URL下载表单 -->
+    <div class="form-section" id="formUrl" style="display:none;">
+        <h2>🔗 通过URL下载</h2>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Pixiv URL</label>
+                <input type="text" class="form-input" id="downloadUrl" placeholder="https://www.pixiv.net/artworks/12345678" style="min-width:400px;">
+            </div>
+            <button class="btn btn-primary" id="btnDownloadUrl" onclick="downloadByUrl()">⬇️ 加入队列</button>
+        </div>
+    </div>
+
+    <!-- 标签补全表单 -->
+    <div class="form-section" id="formTags" style="display:none;">
+        <h2>🏷️ 标签补全</h2>
+        <p style="font-size:13px;color:#8b98a5;margin-bottom:16px;">为数据库中缺少标签的作品，从 Pixiv API 获取并补全标签。支持暂停/继续，中断后重启自动断点续传。</p>
+        <div class="form-row">
+            <div class="form-group">
+                <label>请求间隔 (秒)</label>
+                <input type="number" class="form-input small" id="tagsDelay" value="1.5" min="0.5" max="5" step="0.1">
+                <span style="font-size:11px;color:#536471;margin-top:2px;">建议1-2秒，避免被限流</span>
+            </div>
+            <button class="btn btn-primary" id="btnFetchTags" onclick="fetchTags()">🏷️ 开始补全</button>
+        </div>
+        <div style="margin-top: 12px; padding: 10px 14px; background: rgba(50,145,230,0.08); border-radius: 8px; font-size: 13px; color: var(--text-secondary);" id="tagsInfo">
+            点击按钮查看缺少标签的作品数量
+        </div>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="progress-section" id="progressSection">
+        <div class="progress-header">
+            <span class="title" id="progressTitle">准备中...</span>
+            <span class="percent" id="progressPercent">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+        <div class="progress-message" id="progressMessage">等待开始...</div>
+    </div>
+
+    <!-- 日志窗口 -->
+    <div class="log-section" id="logSection">
+        <div class="log-header">
+            <h3 id="logTitle">📋 下载日志</h3>
+            <button class="btn btn-outline btn-sm" onclick="clearLog()">清空</button>
+        </div>
+        <div class="log-content" id="logContent">
+            <div class="log-line log-info">等待下载任务...</div>
+        </div>
+    </div>
+
+    <!-- 缩略图预览 -->
+    <div class="preview-section" id="previewSection">
+        <h2 style="font-size:16px;margin-bottom:12px;color:#fff;">🖼️ 下载预览</h2>
+        <div class="preview-grid" id="previewGrid"></div>
+    </div>
+
+    <!-- 统计结果 -->
+    <div class="result-section" id="resultSection">
+        <h2 style="font-size:16px;margin-bottom:16px;color:#fff;">📊 下载结果</h2>
+        <div class="result-grid" id="resultGrid"></div>
+    </div>
+</div>
+
+<script>
+// ========== 状态管理 ==========
+let currentTab = 'work';
+let watchingTaskId = null;    // 当前正在"观看"（显示日志/进度）的任务
+let eventSource = null;
+let previewImages = [];
+let activeTasks = {};         // task_id -> task_info
+
+// ========== Tab 切换 ==========
+function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    const tabIndex = { 'work': 0, 'artist': 1, 'artist-new': 2, 'bookmarks': 3, 'url': 4, 'tags': 5 }[tab];
+    document.querySelectorAll('.tab')[tabIndex].classList.add('active');
+    document.getElementById('formWork').style.display = tab === 'work' ? '' : 'none';
+    document.getElementById('formArtist').style.display = tab === 'artist' ? '' : 'none';
+    document.getElementById('formArtistNew').style.display = tab === 'artist-new' ? '' : 'none';
+    document.getElementById('formBookmarks').style.display = tab === 'bookmarks' ? '' : 'none';
+    document.getElementById('formUrl').style.display = tab === 'url' ? '' : 'none';
+    document.getElementById('formTags').style.display = tab === 'tags' ? '' : 'none';
+    // 切换到标签补全 tab 时自动查询缺少标签的作品数量
+    if (tab === 'tags') {
+        loadTagsInfo();
+    }
+}
+
+// ========== 日志 ==========
+function addLog(msg, type) {
+    type = type || 'info';
+    const log = document.getElementById('logContent');
+    const line = document.createElement('div');
+    line.className = `log-line log-${type}`;
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+    // 限制 DOM 日志数量
+    while (log.children.length > 300) {
+        log.removeChild(log.firstChild);
+    }
+}
+
+function clearLog() {
+    document.getElementById('logContent').innerHTML = '<div class="log-line log-info">日志已清空</div>';
+    document.getElementById('previewGrid').innerHTML = '';
+    document.getElementById('previewSection').classList.remove('active');
+    previewImages = [];
+}
+
+function restoreLogs(logs) {
+    // 恢复历史日志（页面重连时用）
+    const log = document.getElementById('logContent');
+    log.innerHTML = '';
+    if (!logs || logs.length === 0) {
+        log.innerHTML = '<div class="log-line log-info">等待下载任务...</div>';
+        return;
+    }
+    logs.forEach(l => {
+        const line = document.createElement('div');
+        line.className = `log-line log-${l.type || 'info'}`;
+        line.textContent = `[${l.time}] ${l.message}`;
+        log.appendChild(line);
+    });
+    log.scrollTop = log.scrollHeight;
+}
+
+// ========== 进度条 ==========
+function resetProgressUI() {
+    document.getElementById('progressSection').classList.remove('active');
+    document.getElementById('resultSection').classList.remove('active');
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('progressPercent').textContent = '0%';
+    document.getElementById('progressMessage').textContent = '等待开始...';
+    document.getElementById('progressTitle').textContent = '准备中...';
+    document.getElementById('previewGrid').innerHTML = '';
+    document.getElementById('previewSection').classList.remove('active');
+    previewImages = [];
+}
+
+// ========== SSE 连接 ==========
+function connectSSE(taskId) {
+    if (eventSource) eventSource.close();
+    watchingTaskId = taskId;
+
+    resetProgressUI();
+    clearLog();
+    addLog(`正在连接任务 ${taskId}...`, 'info');
+
+    eventSource = new EventSource(`/api/stream/${taskId}`);
+
+    eventSource.addEventListener('connected', (e) => {
+        const d = JSON.parse(e.data);
+        addLog(`已连接到任务 ${d.task_id}`, 'info');
+        // 从 API 拉取已有日志历史
+        fetchTaskStatusAndRestore(taskId);
+    });
+
+    eventSource.addEventListener('progress', (e) => {
+        const d = JSON.parse(e.data);
+        document.getElementById('progressSection').classList.add('active');
+        document.getElementById('progressBar').style.width = d.total > 0 ? `${Math.round(d.current / d.total * 100)}%` : '0%';
+        document.getElementById('progressPercent').textContent = d.total > 0 ? `${Math.round(d.current / d.total * 100)}%` : '...';
+        document.getElementById('progressMessage').textContent = d.message;
+        if (d.work_id) {
+            document.getElementById('progressTitle').textContent = `作品 ${d.work_id}`;
+        }
+    });
+
+    eventSource.addEventListener('artist_info', (e) => {
+        const d = JSON.parse(e.data);
+        addLog(`作者: ${d.artist_name} (ID: ${d.artist_id})`, 'success');
+    });
+
+    eventSource.addEventListener('works_loaded', (e) => {
+        const d = JSON.parse(e.data);
+        addLog(`获取到 ${d.total} 个作品，准备下载 ${d.to_download !== undefined ? d.to_download : d.total} 个`, 'info');
+    });
+
+    eventSource.addEventListener('incremental_info', (e) => {
+        const d = JSON.parse(e.data);
+        addLog(`数据库中已有 ${d.total_works - d.new_works} 个作品，发现 ${d.new_works} 个新作品`, 'info');
+    });
+
+    eventSource.addEventListener('bookmark_info', (e) => {
+        const d = JSON.parse(e.data);
+        addLog(`收藏类型: ${d.rest_type}，共 ${d.total_bookmarks} 个作品`, 'info');
+    });
+
+    eventSource.addEventListener('url_parsed', (e) => {
+        const d = JSON.parse(e.data);
+        addLog(`解析URL: ${d.type === 'work' ? '作品' : '作者'} ID=${d.id}`, 'info');
+    });
+
+    eventSource.addEventListener('status_change', (e) => {
+        const d = JSON.parse(e.data);
+        if (d.status === 'paused') {
+            addLog('⏸ 任务已暂停', 'warn');
+        } else if (d.status === 'running') {
+            addLog('▶ 任务已恢复', 'success');
+        } else if (d.status === 'cancelled') {
+            addLog('⏹ 任务已取消', 'error');
+        }
+        refreshTaskQueue();
+    });
+
+    eventSource.addEventListener('complete', (e) => {
+        const d = JSON.parse(e.data);
+        if (d.cancelled) {
+            addLog('任务已取消', 'warn');
+            closeSSE();
+            refreshTaskQueue();
+            return;
+        }
+        document.getElementById('progressBar').style.width = '100%';
+        document.getElementById('progressPercent').textContent = '100%';
+        document.getElementById('progressTitle').textContent = '下载完成';
+        addLog('✅ 下载任务完成!', 'success');
+
+        // 显示结果
+        document.getElementById('resultSection').classList.add('active');
+        const grid = document.getElementById('resultGrid');
+        let html = '';
+        if (d.downloaded !== undefined) html += `<div class="result-item"><div class="val">${d.downloaded}</div><div class="lbl">下载成功</div></div>`;
+        if (d.skipped !== undefined) html += `<div class="result-item"><div class="val">${d.skipped}</div><div class="lbl">跳过</div></div>`;
+        if (d.failed !== undefined) html += `<div class="result-item"><div class="val" style="color:#f4212e">${d.failed}</div><div class="lbl">失败</div></div>`;
+        if (d.downloaded_works !== undefined) html += `<div class="result-item"><div class="val">${d.downloaded_works}</div><div class="lbl">下载作品</div></div>`;
+        if (d.skipped_works !== undefined) html += `<div class="result-item"><div class="val">${d.skipped_works}</div><div class="lbl">跳过作品</div></div>`;
+        if (d.failed_works !== undefined) html += `<div class="result-item"><div class="val" style="color:#f4212e">${d.failed_works}</div><div class="lbl">失败作品</div></div>`;
+        if (d.total_images !== undefined) html += `<div class="result-item"><div class="val">${d.total_images}</div><div class="lbl">图片总数</div></div>`;
+        grid.innerHTML = html;
+
+        if (previewImages.length > 0) {
+            document.getElementById('previewSection').classList.add('active');
+            document.getElementById('previewGrid').innerHTML = previewImages.map(p => `
+                <div class="preview-item">
+                    <div class="img-wrap">
+                        <img src="/original/${encodeURIComponent(p.path)}" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <span class="no-img" style="display:none">🖼️</span>
+                    </div>
+                    <div class="img-info">
+                        <div class="name">${p.name}</div>
+                        <div>${p.size ? (p.size / 1024).toFixed(1) + ' KB' : ''}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        closeSSE();
+        refreshTaskQueue();
+    });
+
+    eventSource.addEventListener('error', (e) => {
+        try {
+            const d = JSON.parse(e.data);
+            addLog('❌ 错误: ' + d.error, 'error');
+        } catch {}
+        closeSSE();
+        refreshTaskQueue();
+    });
+
+    eventSource.onerror = () => {
+        addLog('⚠️ SSE 连接断开，3秒后尝试重连...', 'warn');
+        closeSSE();
+        // 自动重连
+        setTimeout(() => {
+            if (watchingTaskId) {
+                addLog('正在重连...', 'info');
+                connectSSE(watchingTaskId);
+            }
+        }, 3000);
+    };
+}
+
+function closeSSE() {
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+    }
+}
+
+async function fetchTaskStatusAndRestore(taskId) {
+    // 从服务器拉取任务完整状态，恢复日志
+    try {
+        const r = await fetch(`/api/task/${taskId}/status`);
+        const d = await r.json();
+        if (d.success && d.data) {
+            const status = d.data;
+            // 恢复日志
+            if (status.logs && status.logs.length > 0) {
+                restoreLogs(status.logs);
+            }
+            // 恢复进度
+            if (status.progress) {
+                const p = status.progress;
+                if (p.total > 0) {
+                    document.getElementById('progressSection').classList.add('active');
+                    document.getElementById('progressBar').style.width = `${Math.round(p.current / p.total * 100)}%`;
+                    document.getElementById('progressPercent').textContent = `${Math.round(p.current / p.total * 100)}%`;
+                    document.getElementById('progressMessage').textContent = p.message;
+                    if (p.work_id) {
+                        document.getElementById('progressTitle').textContent = `作品 ${p.work_id}`;
+                    }
+                }
+            }
+            // 恢复额外信息
+            if (status.extra_info) {
+                const ei = status.extra_info;
+                if (ei.artist_name) {
+                    addLog(`作者: ${ei.artist_name} (ID: ${ei.artist_id})`, 'success');
+                }
+                if (ei.total !== undefined) {
+                    addLog(`共 ${ei.total} 个作品`, 'info');
+                }
+                if (ei.new_works !== undefined) {
+                    addLog(`发现 ${ei.new_works} 个新作品`, 'info');
+                }
+            }
+            // 如果已完成，显示结果
+            if (status.result && status.status === 'completed') {
+                showResult(status.result);
+            }
+        }
+    } catch (e) {
+        console.error('恢复任务状态失败:', e);
+    }
+}
+
+function showResult(d) {
+    document.getElementById('resultSection').classList.add('active');
+    const grid = document.getElementById('resultGrid');
+    let html = '';
+    if (d.downloaded !== undefined) html += `<div class="result-item"><div class="val">${d.downloaded}</div><div class="lbl">下载成功</div></div>`;
+    if (d.skipped !== undefined) html += `<div class="result-item"><div class="val">${d.skipped}</div><div class="lbl">跳过</div></div>`;
+    if (d.failed !== undefined) html += `<div class="result-item"><div class="val" style="color:#f4212e">${d.failed}</div><div class="lbl">失败</div></div>`;
+    if (d.downloaded_works !== undefined) html += `<div class="result-item"><div class="val">${d.downloaded_works}</div><div class="lbl">下载作品</div></div>`;
+    if (d.skipped_works !== undefined) html += `<div class="result-item"><div class="val">${d.skipped_works}</div><div class="lbl">跳过作品</div></div>`;
+    if (d.failed_works !== undefined) html += `<div class="result-item"><div class="val" style="color:#f4212e">${d.failed_works}</div><div class="lbl">失败作品</div></div>`;
+    if (d.total_images !== undefined) html += `<div class="result-item"><div class="val">${d.total_images}</div><div class="lbl">图片总数</div></div>`;
+    grid.innerHTML = html;
+}
+
+// ========== 任务队列 UI ==========
+function buildTaskCard(t) {
+    const statusClass = t.status;
+    const statusLabel = {
+        'pending': '排队中',
+        'running': '进行中',
+        'paused': '已暂停',
+        'completed': '已完成',
+        'failed': '失败',
+        'cancelled': '已取消',
+    }[t.status] || t.status;
+
+    const typeLabel = {
+        'work': '单个作品',
+        'artist': '作者作品',
+        'artist-new': '增量下载',
+        'bookmarks': '收藏作品',
+        'bookmark-refill': '收藏补全',
+        'url': 'URL下载',
+        'sync': '本地同步',
+        'tags': '标签补全',
+    }[t.task_type] || t.task_type;
+
+    const typeBadgeClass = (t.task_type === 'artist' || t.task_type === 'artist-new') ? 'artist' :
+                           (t.task_type === 'bookmarks' || t.task_type === 'bookmark-refill') ? 'bookmarks' :
+                           t.task_type === 'tags' ? 'bookmarks' :
+                           t.task_type === 'sync' ? 'sync' : '';
+
+    // 进度信息
+    const p = t.progress || {};
+    const progressPct = p.total > 0 ? Math.round(p.current / p.total * 100) : 0;
+    let progressHtml = '';
+    if (t.status === 'running' || t.status === 'paused') {
+        progressHtml = `
+            <div class="task-progress">
+                <div class="task-progress-bar">
+                    <div class="task-progress-fill" style="width:${progressPct}%"></div>
+                </div>
+                <div class="task-progress-text">${p.message || ''} ${p.total > 0 ? `(${p.current}/${p.total})` : ''}</div>
+            </div>
+        `;
+    }
+
+    // 操作按钮
+    let actionsHtml = '';
+    if (t.status === 'running') {
+        actionsHtml = `
+            <button class="btn btn-warning btn-sm" onclick="pauseTask('${t.task_id}')">⏸ 暂停</button>
+            <button class="btn btn-danger btn-sm" onclick="cancelTask('${t.task_id}')">⏹ 取消</button>
+        `;
+    } else if (t.status === 'paused') {
+        actionsHtml = `
+            <button class="btn btn-success btn-sm" onclick="resumeTask('${t.task_id}')">▶ 继续</button>
+            <button class="btn btn-danger btn-sm" onclick="cancelTask('${t.task_id}')">⏹ 取消</button>
+        `;
+    } else if (t.status === 'pending') {
+        actionsHtml = `
+            <button class="btn btn-danger btn-sm" onclick="cancelTask('${t.task_id}')">⏹ 取消</button>
+        `;
+    }
+
+    // 观看按钮（仅运行中/暂停的任务）
+    let watchBtn = '';
+    if ((t.status === 'running' || t.status === 'paused') && t.task_id !== watchingTaskId) {
+        watchBtn = `<button class="btn btn-outline btn-sm" onclick="watchTask('${t.task_id}')">👁 查看</button>`;
+    } else if (t.task_id === watchingTaskId) {
+        watchBtn = `<span style="font-size:11px;color:#1d9bf0;">👁 当前查看</span>`;
+    }
+
+    return `
+        <div class="task-card">
+            <div class="task-card-header">
+                <div class="task-card-title">
+                    <span class="status-dot ${statusClass}"></span>
+                    <span>${typeLabel}</span>
+                    <span class="task-type-badge ${typeBadgeClass}">${t.task_type}</span>
+                    <span class="status-text ${statusClass}">${statusLabel}</span>
+                </div>
+                <div class="task-card-actions">
+                    ${watchBtn}
+                    ${actionsHtml}
+                </div>
+            </div>
+            <div class="task-card-meta">任务ID: ${t.task_id} · 创建于 ${t.created_at ? new Date(t.created_at).toLocaleTimeString() : '-'}</div>
+            ${progressHtml}
+        </div>
+    `;
+}
+
+function watchTask(taskId) {
+    closeSSE();
+    watchingTaskId = null;
+    document.getElementById('logTitle').textContent = `📋 日志 - ${taskId}`;
+    connectSSE(taskId);
+    refreshTaskQueue();
+}
+
+// ========== 任务操作 ==========
+async function pauseTask(taskId) {
+    try {
+        await fetch(`/api/task/${taskId}/pause`, { method: 'POST' });
+        addLog('⏸ 正在暂停...', 'warn');
+        refreshTaskQueue();
+    } catch (e) { console.error(e); }
+}
+
+async function resumeTask(taskId) {
+    try {
+        await fetch(`/api/task/${taskId}/resume`, { method: 'POST' });
+        addLog('▶ 正在恢复...', 'success');
+        refreshTaskQueue();
+    } catch (e) { console.error(e); }
+}
+
+async function cancelTask(taskId) {
+    try {
+        await fetch(`/api/task/${taskId}/cancel`, { method: 'POST' });
+        addLog('⏹ 正在取消...', 'error');
+        refreshTaskQueue();
+    } catch (e) { console.error(e); }
+}
+
+// ========== 提交下载任务 ==========
+async function submitDownload(type, body) {
+    const taskId = type + '_' + Date.now();
+    body.task_id = taskId;
+
+    addLog(`提交任务: ${type}`, 'info');
+
+    let url;
+    switch (type) {
+        case 'dl_work': url = '/api/download/work'; break;
+        case 'dl_artist': url = '/api/download/artist'; break;
+        case 'dl_artist_new': url = '/api/download/artist-new'; break;
+        case 'dl_bookmark': url = '/api/download/bookmarks'; break;
+        case 'dl_url': url = '/api/download/url'; break;
+    }
+
+    try {
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (d.success) {
+            addLog(`任务已加入队列: ${d.task_id}`, 'success');
+            watchTask(d.task_id);
+        } else {
+            addLog('提交失败: ' + (d.error || '未知错误'), 'error');
+        }
+    } catch (e) {
+        addLog('请求失败: ' + e.message, 'error');
+    }
+}
+
+function downloadWork() {
+    const workId = document.getElementById('workId').value.trim();
+    if (!workId) { addLog('请输入作品ID', 'error'); return; }
+    const force = document.getElementById('forceWork').checked;
+    submitDownload('dl_work', { work_id: workId, force });
+}
+
+function downloadArtist() {
+    const artistId = document.getElementById('artistId').value.trim();
+    if (!artistId) { addLog('请输入作者ID', 'error'); return; }
+    const limit = parseInt(document.getElementById('artistLimit').value) || 0;
+    const force = document.getElementById('forceArtist').checked;
+    submitDownload('dl_artist', { artist_id: artistId, limit: limit || null, force });
+}
+
+function downloadByUrl() {
+    const url = document.getElementById('downloadUrl').value.trim();
+    if (!url) { addLog('请输入Pixiv URL', 'error'); return; }
+    submitDownload('dl_url', { url });
+}
+
+function downloadArtistNew() {
+    const artistId = document.getElementById('artistNewId').value.trim();
+    if (!artistId) { addLog('请输入作者ID', 'error'); return; }
+    const force = document.getElementById('forceArtistNew').checked;
+    submitDownload('dl_artist_new', { artist_id: artistId, force });
+}
+
+function downloadBookmarks() {
+    const rest = document.getElementById('bookmarkRest').value;
+    const limit = parseInt(document.getElementById('bookmarkLimit').value) || 0;
+    const maxPages = parseInt(document.getElementById('bookmarkMaxPages').value) || 0;
+    const force = document.getElementById('forceBookmark').checked;
+    submitDownload('dl_bookmark', {
+        rest,
+        limit: limit || null,
+        max_pages: maxPages || null,
+        force
+    });
+}
+
+// ========== 标签补全 ==========
+async function loadTagsInfo() {
+    try {
+        const r = await fetch('/api/tags');
+        const d = await r.json();
+        if (d.success) {
+            const totalTags = d.data ? d.data.length : 0;
+            // 还需要查询缺少标签的作品数
+            const r2 = await fetch('/api/tags/status');
+            const d2 = await r2.json();
+            const withoutTags = d2.success ? d2.data.without_tags : '?';
+            document.getElementById('tagsInfo').innerHTML = 
+                `📊 已有标签种类: <b>${totalTags}</b> 种 · 缺少标签的作品: <b style="color:var(--orange)">${withoutTags}</b> 个`;
+        }
+    } catch (e) {
+        console.error('加载标签信息失败:', e);
+    }
+}
+
+function fetchTags() {
+    const delay = parseFloat(document.getElementById('tagsDelay').value) || 1.5;
+    submitDownload('dl_tags', { delay });
+}
+
+// 扩展 submitDownload 支持 tags 类型
+const _origSubmitDownload2 = submitDownload;
+submitDownload = function(type, body) {
+    startPolling();
+    if (type === 'dl_tags') {
+        const taskId = 'dl_tags_' + Date.now();
+        body.task_id = taskId;
+        addLog('提交任务: 标签补全', 'info');
+        fetch('/api/download/tags', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        }).then(r => r.json()).then(d => {
+            if (d.success) {
+                addLog('标签补全任务已加入队列: ' + d.task_id, 'success');
+                watchTask(d.task_id);
+            } else {
+                addLog('提交失败: ' + (d.error || '未知错误'), 'error');
+            }
+        }).catch(e => {
+            addLog('请求失败: ' + e.message, 'error');
+        });
+        return;
+    }
+    return _origSubmitDownload2(type, body);
+};
+
+// 回车键提交
+document.getElementById('workId').addEventListener('keydown', e => { if (e.key === 'Enter') downloadWork(); });
+document.getElementById('artistId').addEventListener('keydown', e => { if (e.key === 'Enter') downloadArtist(); });
+document.getElementById('artistNewId').addEventListener('keydown', e => { if (e.key === 'Enter') downloadArtistNew(); });
+document.getElementById('downloadUrl').addEventListener('keydown', e => { if (e.key === 'Enter') downloadByUrl(); });
+
+// ========== 页面加载 ==========
+let pollInterval = null;
+
+function startPolling() {
+    if (pollInterval) return;
+    pollInterval = setInterval(refreshTaskQueue, 3000);
+}
+
+function stopPolling() {
+    if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+    }
+}
+
+async function refreshTaskQueue() {
+    try {
+        const r = await fetch('/api/tasks/active');
+        const d = await r.json();
+        if (!d.success) return;
+
+        const tasks = d.data;
+        activeTasks = {};
+        tasks.forEach(t => { activeTasks[t.task_id] = t; });
+        // 失败任务数随队列一起返回，避免额外请求
+        updateFailedBadge(d.failed_count || 0);
+
+        const list = document.getElementById('taskQueueList');
+        document.getElementById('queueCount').textContent = tasks.length > 0 ? `(${tasks.length} 个任务)` : '';
+
+        if (tasks.length === 0) {
+            list.innerHTML = `<div class="empty-queue"><div class="icon">📭</div><div>暂无任务，提交一个下载任务开始吧</div></div>`;
+            if (!watchingTaskId) {
+                document.getElementById('logTitle').textContent = '📋 下载日志';
+                document.getElementById('progressSection').classList.remove('active');
+                document.getElementById('resultSection').classList.remove('active');
+            }
+            // 没有活跃任务了，停止轮询
+            stopPolling();
+            return;
+        }
+
+        // 有任务时保持轮询
+        startPolling();
+
+        // 自动选择第一个运行中的任务来观看
+        if (!watchingTaskId) {
+            const runningTask = tasks.find(t => t.status === 'running' || t.status === 'paused');
+            if (runningTask) {
+                watchTask(runningTask.task_id);
+            }
+        }
+
+        list.innerHTML = tasks.map(t => buildTaskCard(t)).join('');
+
+    } catch (e) {
+        console.error('刷新任务队列失败:', e);
+    }
+}
+
+// 提交下载后开始轮询
+const origSubmitDownload = submitDownload;
+submitDownload = function(type, body) {
+    startPolling();
+    return origSubmitDownload(type, body);
+};
+
+// ========== 失败任务重试 ==========
+function updateFailedBadge(count) {
+    const badge = document.getElementById('failedCount');
+    const btn = document.getElementById('btnRetryFailed');
+    if (!badge || !btn) return;
+    if (count > 0) {
+        badge.style.display = '';
+        badge.textContent = `❌ ${count} 个失败任务`;
+        btn.style.display = '';
+    } else {
+        badge.style.display = 'none';
+        btn.style.display = 'none';
+    }
+}
+
+async function retryFailed() {
+    const btn = document.getElementById('btnRetryFailed');
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/tasks/retry-failed', { method: 'POST' });
+        const d = await r.json();
+        if (d.success) {
+            addLog(`🔄 已将 ${d.retried} 个失败任务重新加入队列`, 'success');
+            refreshTaskQueue();
+        } else {
+            addLog('重试失败: ' + (d.error || '未知错误'), 'error');
+        }
+    } catch (e) {
+        addLog('重试失败: ' + e.message, 'error');
+    }
+    btn.disabled = false;
+}
+
+async function clearTaskHistory() {
+    if (!confirm('确定清除所有历史任务记录（已取消/已完成）吗？此操作不影响任何文件。')) return;
+    try {
+        const r = await fetch('/api/tasks/clear-history', { method: 'POST' });
+        const d = await r.json();
+        if (d.success) {
+            addLog('🗑 历史任务记录已清空', 'success');
+            refreshTaskQueue();
+        } else {
+            addLog('清空失败: ' + (d.error || '未知错误'), 'error');
+        }
+    } catch (e) {
+        addLog('清空失败: ' + e.message, 'error');
+    }
+}
+
+// ========== 下载表单记忆（localStorage 记住上次输入） ==========
+const DL_MEM_KEYS = {
+    workId: 'dl_work_id',
+    artistId: 'dl_artist_id',
+    artistLimit: 'dl_artist_limit',
+    artistNewId: 'dl_artist_new_id',
+    downloadUrl: 'dl_url',
+    bookmarkRest: 'dl_bookmark_rest',
+    bookmarkLimit: 'dl_bookmark_limit',
+    bookmarkMaxPages: 'dl_bookmark_max_pages',
+};
+
+function restoreDownloadMemory() {
+    for (const [id, key] of Object.entries(DL_MEM_KEYS)) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const saved = localStorage.getItem('pixiv_' + key);
+        if (saved !== null && saved !== '') {
+            if (el.tagName === 'SELECT') {
+                if ([...el.options].some(o => o.value === saved)) el.value = saved;
+            } else {
+                el.value = saved;
+            }
+        }
+        if (el.tagName === 'SELECT') {
+            el.addEventListener('change', () => localStorage.setItem('pixiv_' + key, el.value));
+        } else {
+            el.addEventListener('input', () => localStorage.setItem('pixiv_' + key, el.value));
+        }
+    }
+}
+
+function init() {
+    // 先刷新任务队列（同时更新失败任务数），有活跃任务则自动重连/轮询
+    refreshTaskQueue();
+    // 回填上次提交的表单输入
+    restoreDownloadMemory();
+
+    // 从其他页面跳转时定位到指定标签（如仪表盘"标签补全"入口）
+    const jumpTab = sessionStorage.getItem('downloadTab');
+    if (jumpTab) {
+        sessionStorage.removeItem('downloadTab');
+        switchTab(jumpTab);
+    }
+}
+
+init();
+</script>
+</body>
+</html>

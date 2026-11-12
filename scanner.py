@@ -66,9 +66,10 @@ class FileScanner:
     DIR_PATTERN = re.compile(r'^(\d+)_(.+)$')
     
     # 文件名正则: {work_id}_p{page}.{ext}
+    # 兼容 {work_id}_p{page}-{标题}.{ext}（其他下载工具的命名，标题后缀可选）
     # 包含 webm/mp4：ugoira 动图合成后的视频（封面为 xxx.webm.jpg，不符合该正则，不会重复入库）
     FILE_PATTERN = re.compile(
-        r'^(\d+)_p(\d+)\.(png|jpg|jpeg|gif|webp|webm|mp4)$', re.IGNORECASE)
+        r'^(\d+)_p(\d+)(?:-.+)?\.(png|jpg|jpeg|gif|webp|webm|mp4)$', re.IGNORECASE)
     
     def __init__(self, db: Database, download_path: str = None):
         self.db = db

@@ -548,6 +548,7 @@
     <div class="image-viewer-main">
         <button class="image-viewer-nav prev" id="viewerPrev">‹</button>
         <img id="viewerImg" src="" alt="">
+        <video id="viewerVideo" class="viewer-media-video" playsinline loop muted controls></video>
         <button class="image-viewer-nav next" id="viewerNext">›</button>
     </div>
     <div class="image-viewer-thumbnails" id="viewerThumbs"></div>
@@ -819,6 +820,7 @@ function renderImageGrid() {
         <div class="image-card fade-in" onclick="openViewer(${i})">
             <div class="image-card-thumb" data-img-idx="${i}">
                 <div class="image-card-skeleton"></div>
+                ${isVideoPath(item.file_path) ? '<span class="media-badge">🎬 动图</span>' : ''}
                 ${pageStr}
             </div>
             <div class="image-card-body">
@@ -961,6 +963,13 @@ function openViewer(i) {
 function closeViewer() {
     document.getElementById('viewerOverlay').classList.remove('active');
     document.body.style.overflow = '';
+    // 关闭时停止动图播放
+    const videoEl = document.getElementById('viewerVideo');
+    if (videoEl) {
+        try { videoEl.pause(); } catch (e) {}
+        videoEl.removeAttribute('src');
+        videoEl.style.display = 'none';
+    }
     viewerItems = [];
     document.removeEventListener('keydown', viewerKeyHandler);
 }
@@ -977,7 +986,9 @@ function showViewerImg() {
     const item = viewerItems[viewerIdx];
     if (!item) return;
     const imgEl = document.getElementById('viewerImg');
-    imgEl.src = '/original/' + encodeURIComponent(item.file_path);
+    const videoEl = document.getElementById('viewerVideo');
+    setViewerMedia(imgEl, videoEl, item.file_path,
+        '/original/' + encodeURIComponent(item.file_path));
     document.getElementById('viewerPage').textContent =
         `${viewerIdx + 1} / ${viewerItems.length}`;
     document.getElementById('viewerPrev').disabled = viewerIdx <= 0;
@@ -1013,8 +1024,8 @@ async function viewerCopy() {
     btn.disabled = true; btn.classList.add('copied');
 
     try {
-        // 直接 fetch 原图，拿到原始格式 blob（保持原格式原质量，本地/局域网均最优）
-        const resp = await fetch('/original/' + encodeURIComponent(item.file_path));
+        // 直接 fetch 原图，拿到原始格式 blob（动图取封面 jpg）
+        const resp = await fetch('/original/' + encodeURIComponent(mediaCopyPath(item.file_path)));
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const blob = await resp.blob();
         const mime = blob.type || 'image/png';

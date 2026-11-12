@@ -37,6 +37,9 @@ class Config(BaseModel):
     retry_delay: float = 5.0      # 重试延迟(秒)
     download_concurrency: int = 4  # 图片并发下载数（同一作品的多页并行下载）
 
+    # ugoira 动图（需要 ffmpeg）
+    ffmpeg_path: str = ""         # ffmpeg 可执行文件路径，留空自动检测
+
     # API设置
     api_base_url: str = "https://www.pixiv.net/ajax"
 

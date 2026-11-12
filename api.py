@@ -182,6 +182,7 @@ class PixivAPI:
                 'userId': body.get('userId', ''),
                 'userName': body.get('userName', ''),
                 'pageCount': body.get('pageCount', 1),
+                'illustType': body.get('illustType', 0),  # 0=插画 1=漫画 2=ugoira动图
                 'width': body.get('width', 0),
                 'height': body.get('height', 0),
                 'tags': [tag.get('tag', '') for tag in body.get('tags', {}).get('tags', [])],
@@ -217,6 +218,41 @@ class PixivAPI:
                 })
             return pages
         return []
+
+    def get_ugoira_meta(self, work_id: str) -> Optional[Dict]:
+        """
+        获取 ugoira 动图元数据。
+
+        Returns:
+            {
+                'src': zip 下载地址,
+                'originalSrc': 原始 zip 地址,
+                'mime_type': 'image/jpeg' | 'image/png',
+                'frames': [{'file': '000000.jpg', 'delay': 70}, ...]  # delay 毫秒
+            }
+            失败返回 None
+        """
+        url = f"https://www.pixiv.net/ajax/illust/{work_id}/ugoira_meta"
+        params = {'lang': 'zh'}
+        try:
+            data, status = self.get(url, params=params)
+            if data and not data.get('error') and isinstance(data.get('body'), dict):
+                body = data['body']
+                frames = []
+                for i, fr in enumerate(body.get('frames') or []):
+                    frames.append({
+                        'file': fr.get('file') or f'{i:06d}.jpg',
+                        'delay': int(fr.get('delay', 100) or 100),
+                    })
+                return {
+                    'src': body.get('src') or body.get('originalSrc') or '',
+                    'originalSrc': body.get('originalSrc') or '',
+                    'mime_type': body.get('mime_type') or 'image/jpeg',
+                    'frames': frames,
+                }
+        except Exception as e:
+            logger.error(f"获取 ugoira 元数据失败 {work_id}: {e}")
+        return None
 
     def get_work_id_from_url(self, url: str) -> Optional[str]:
         """

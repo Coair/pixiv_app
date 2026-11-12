@@ -695,6 +695,7 @@
     <div class="art-viewer-main">
         <button class="art-viewer-nav prev" id="artViewerPrevBtn" onclick="artViewerPrev()">‹</button>
         <img id="artViewerImage" src="" alt="">
+        <video id="artViewerVideo" class="viewer-media-video" playsinline loop muted controls></video>
         <button class="art-viewer-nav next" id="artViewerNextBtn" onclick="artViewerNext()">›</button>
     </div>
     <div class="art-viewer-thumbnails" id="artViewerThumbnails"></div>
@@ -1106,6 +1107,7 @@ function renderWorksBatch(grid, works, start, count) {
                             style="position:absolute;top:0;left:0;">
                        <span class="no-img" style="display:none">🖼️</span>`
                     : '<span class="no-img">🖼️</span>'}
+                ${isVideoPath(firstPath) ? '<span class="media-badge">🎬 动图</span>' : ''}
                 ${hasMultiplePages ? `<span class="work-card-page-indicator">${downloaded}/${total}</span>` : ''}
                 ${isBookmarked ? '<span style="position:absolute;top:6px;left:6px;font-size:14px;z-index:2;filter:drop-shadow(0 0 3px rgba(0,0,0,0.8));" title="已收藏">⭐</span>' : ''}
                 <button class="work-del-btn" onclick="event.stopPropagation(); deleteWork(${w.id}, '${(w.title || '无标题').slice(0, 30).replace(/'/g, "\\'")}')" title="删除该作品（含文件，不可恢复）">🗑</button>
@@ -1558,6 +1560,12 @@ async function openArtImageViewer(workId, startIndex) {
 
 function closeArtImageViewer() {
     document.getElementById('artImageViewerOverlay').classList.remove('active');
+    const videoEl = document.getElementById('artViewerVideo');
+    if (videoEl) {
+        try { videoEl.pause(); } catch (e) {}
+        videoEl.removeAttribute('src');
+        videoEl.style.display = 'none';
+    }
     artViewerData = null;
     artViewerIndex = 0;
 }
@@ -1566,9 +1574,11 @@ function showArtViewerImage() {
     if (!artViewerData) return;
     const img = artViewerData.images[artViewerIndex];
     const viewerImg = document.getElementById('artViewerImage');
+    const videoEl = document.getElementById('artViewerVideo');
     const src = img.file_path;
     // 大图查看器使用原图路由 /original/，而非缩略图
-    viewerImg.src = src ? (src.startsWith('/original/') ? src : '/original/' + encodeURIComponent(src)) : '';
+    const url = src ? (src.startsWith('/original/') ? src : '/original/' + encodeURIComponent(src)) : '';
+    setViewerMedia(viewerImg, videoEl, src, url);
 
     document.getElementById('artViewerPageInfo').textContent =
         `${artViewerIndex + 1} / ${artViewerData.images.length}`;
@@ -1636,8 +1646,8 @@ async function copyArtViewerImage() {
         const idx = fp.indexOf('/original/');
         if (idx >= 0) fp = decodeURIComponent(fp.substring(idx + '/original/'.length));
 
-        // 直接 fetch 原图，拿到原始格式 blob（保持原格式原质量，本地/局域网均最优）
-        const resp = await fetch('/original/' + encodeURIComponent(fp));
+        // 直接 fetch 原图，拿到原始格式 blob（动图取封面 jpg）
+        const resp = await fetch('/original/' + encodeURIComponent(mediaCopyPath(fp)));
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const blob = await resp.blob();
         const mime = blob.type || 'image/png';

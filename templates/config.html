@@ -307,6 +307,16 @@ textarea.form-input {
                     <span class="form-hint">同一作品多页并行下载，建议 3-6，过高易触发风控</span>
                 </div>
             </div>
+            <div class="form-row">
+                <div class="form-group half">
+                    <label class="form-label">ffmpeg 路径（留空自动检测）</label>
+                    <input type="text" class="form-input" id="ffmpegPath" placeholder="例如 C:\ffmpeg\bin\ffmpeg.exe">
+                </div>
+                <div class="form-group half">
+                    <label class="form-label">动图（ugoira）支持</label>
+                    <span class="form-hint" id="ffmpegStatus">检测中...</span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -401,6 +411,8 @@ async function loadConfig() {
         document.getElementById('maxRetries').value = c.max_retries || 3;
         document.getElementById('retryDelay').value = c.retry_delay || 2;
         document.getElementById('downloadConcurrency').value = c.download_concurrency || 4;
+        document.getElementById('ffmpegPath').value = c.ffmpeg_path || '';
+        checkFfmpeg();
 
         // 过滤配置
         document.getElementById('filterEnabled').checked = c.filter_enabled !== false;
@@ -533,6 +545,7 @@ async function saveConfig() {
         max_retries: parseInt(document.getElementById('maxRetries').value) || 3,
         retry_delay: parseFloat(document.getElementById('retryDelay').value) || 2,
         download_concurrency: parseInt(document.getElementById('downloadConcurrency').value) || 4,
+        ffmpeg_path: document.getElementById('ffmpegPath').value.trim(),
         filter_enabled: document.getElementById('filterEnabled').checked,
         filter_max_pages: parseInt(document.getElementById('filterMaxPages').value) || 30,
         filter_batch_same_day: parseInt(document.getElementById('filterBatchSameDay').value) || 5,
@@ -549,12 +562,34 @@ async function saveConfig() {
         const d = await r.json();
         if (d.success) {
             updateCookieStatus();
+            checkFfmpeg();
             showToast('配置保存成功', 'success');
         } else {
             showToast(d.error || '保存失败', 'error');
         }
     } catch(e) {
         showToast('请求失败: ' + e.message, 'error');
+    }
+}
+
+// 检测 ffmpeg（ugoira 动图依赖）
+async function checkFfmpeg() {
+    const el = document.getElementById('ffmpegStatus');
+    if (!el) return;
+    el.textContent = '检测中...';
+    el.style.color = '';
+    try {
+        const r = await fetch('/api/system/ffmpeg');
+        const d = await r.json();
+        if (d.success && d.data && d.data.available) {
+            el.textContent = `✅ 已启用 · ${d.data.version || ''} · ${d.data.path || ''}`;
+            el.style.color = 'var(--green)';
+        } else {
+            el.textContent = '⚠️ 未检测到 ffmpeg，动图（ugoira）功能不可用';
+            el.style.color = 'var(--orange)';
+        }
+    } catch (e) {
+        el.textContent = '检测失败';
     }
 }
 

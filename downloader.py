@@ -6,12 +6,17 @@ Pixiv Downloader - 下载管理模块
 import os
 import re
 import time
+import shutil
+import zipfile
+import tempfile
 from typing import Dict, List, Callable, Tuple
 from datetime import datetime
 from dataclasses import dataclass
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
+
+import ffmpeg_util
 
 from database import Database
 from api import PixivAPI
@@ -253,7 +258,14 @@ class Downloader:
             
             # 确保作者在数据库中
             self.db.add_or_update_artist(int(artist_id), artist_name)
-            
+
+            # 2.5 ugoira（动图）走独立流程：zip → 帧 → ffmpeg 合成 webm
+            if int(work_info.get('illustType') or 0) == 2:
+                return self._download_ugoira_work(
+                    work_id, artist_id, artist_name, artist_dir,
+                    work_info, result, progress_callback, skip_existing
+                )
+
             # 3. 获取下载链接
             if progress_callback:
                 progress_callback(work_id, 1, 3, "获取下载链接...")
@@ -333,7 +345,124 @@ class Downloader:
             logger.error(f"下载作品失败 {work_id}: {e}")
         
         return result
-    
+
+    def _download_ugoira_work(self, work_id, artist_id, artist_name, artist_dir,
+                              work_info, result, progress_callback, skip_existing):
+        """
+        下载 ugoira 动图：
+        1. 取 ugoira_meta（zip 地址 + 每帧延时）
+        2. 下载 zip 并解压帧
+        3. ffmpeg 合成 {work_id}_p0.webm，首帧另存 {work_id}_p0.webm.jpg 作封面
+        4. 写入 images 表（page=0）
+        未检测到 ffmpeg 时跳过，不影响其他图片。
+        """
+        work_id = int(work_id)
+
+        if not ffmpeg_util.is_available():
+            result.success = True          # 视为正常跳过，不算失败
+            result.skipped += 1
+            result.error_message = '未检测到 ffmpeg，已跳过 ugoira 动图'
+            logger.warning(f"作品 {work_id} 是 ugoira，但未检测到 ffmpeg，已跳过")
+            if progress_callback:
+                progress_callback(work_id, 3, 3, '未检测到 ffmpeg，已跳过动图')
+            return result
+
+        video_path = os.path.join(artist_dir, f'{work_id}_p0.webm')
+        poster_path = video_path + '.jpg'
+
+        # 已存在：跳过，并确保数据库有记录
+        if skip_existing and os.path.exists(video_path):
+            result.skipped += 1
+            existing = {im.file_path for im in self.db.get_work_images(work_id)}
+            if video_path not in existing:
+                self.db.add_image(
+                    work_id=work_id, page=0,
+                    filename=os.path.basename(video_path),
+                    file_path=video_path,
+                    file_size=os.path.getsize(video_path),
+                    original_url='',
+                    is_downloaded=True,
+                    downloaded_at=datetime.now()
+                )
+            if progress_callback:
+                progress_callback(work_id, 3, 3, '动图已存在，跳过')
+            return result
+
+        if self._cancelled:
+            result.error_message = '任务已取消'
+            return result
+        if not self.check_pause():
+            result.error_message = '任务已取消'
+            return result
+
+        if progress_callback:
+            progress_callback(work_id, 1, 3, '获取动图元数据...')
+        meta = self.api.get_ugoira_meta(str(work_id))
+        if not meta or not meta.get('src') or not meta.get('frames'):
+            result.failed += 1
+            result.error_message = '无法获取 ugoira 元数据'
+            return result
+
+        frames = meta['frames']
+        tmp_dir = tempfile.mkdtemp(prefix=f'ugoira_{work_id}_')
+        try:
+            zip_path = os.path.join(tmp_dir, f'{work_id}.zip')
+            if progress_callback:
+                progress_callback(work_id, 2, 3, '下载动图压缩包...')
+            ok, err = self.download_image(meta['src'], zip_path, work_id, 0)
+            if not ok:
+                result.failed += 1
+                result.error_message = f'动图压缩包下载失败: {err}'
+                return result
+
+            frames_dir = os.path.join(tmp_dir, 'frames')
+            os.makedirs(frames_dir, exist_ok=True)
+            try:
+                with zipfile.ZipFile(zip_path) as zf:
+                    ffmpeg_util.safe_extract(zf, frames_dir)
+            except zipfile.BadZipFile:
+                result.failed += 1
+                result.error_message = '动图压缩包损坏'
+                return result
+
+            if progress_callback:
+                progress_callback(work_id, 2, 3, f'合成动图（{len(frames)} 帧）...')
+            ok, err = ffmpeg_util.convert_ugoira(frames_dir, frames, video_path)
+            if not ok:
+                result.failed += 1
+                result.error_message = f'动图合成失败: {err}'
+                logger.error(f"ugoira 合成失败 {work_id}: {err}")
+                return result
+
+            # 首帧作为封面（缩略图/列表用）
+            first_frame = os.path.join(frames_dir, frames[0].get('file', ''))
+            if os.path.isfile(first_frame):
+                ffmpeg_util.make_poster(first_frame, poster_path)
+
+            file_size = os.path.getsize(video_path) if os.path.exists(video_path) else None
+            self.db.add_image(
+                work_id=work_id, page=0,
+                filename=os.path.basename(video_path),
+                file_path=video_path,
+                file_size=file_size,
+                original_url=meta.get('src', ''),
+                is_downloaded=True,
+                downloaded_at=datetime.now()
+            )
+            result.downloaded += 1
+            result.success = True
+            if progress_callback:
+                progress_callback(work_id, 3, 3, '动图下载完成')
+            return result
+
+        except Exception as e:
+            result.failed += 1
+            result.error_message = f'动图处理失败: {e}'
+            logger.error(f"ugoira 处理失败 {work_id}: {e}")
+            return result
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
     def download_artist_works(
         self,
         artist_id: str,

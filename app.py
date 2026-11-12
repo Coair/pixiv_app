@@ -39,6 +39,7 @@ from api import PixivAPI
 from scanner import FileScanner
 from downloader import Downloader
 from cookie_util import parse_cookie_file
+import ffmpeg_util
 
 # 配置日志
 logging.basicConfig(
@@ -1122,6 +1123,15 @@ def serve_thumbnail(filepath):
     if not os.path.exists(abs_path):
         return 'Not Found', 404
 
+    # 视频（ugoira 合成的 webm）：用同名 .jpg 封面生成缩略图
+    ext = os.path.splitext(abs_path)[1].lower()
+    source_path = abs_path
+    if ext in ('.webm', '.mp4', '.mkv', '.m4v'):
+        poster = abs_path + '.jpg'
+        if not os.path.isfile(poster):
+            return 'Not Found', 404
+        source_path = poster
+
     # 检查是否已有缓存缩略图（下载目录 .thumb 下，按文件路径 hash 缓存）
     import hashlib
     thumb_dir = os.path.join(os.path.abspath(get_config().download_path), '.thumb')
@@ -1136,7 +1146,7 @@ def serve_thumbnail(filepath):
         os.makedirs(thumb_dir, exist_ok=True)
         from PIL import Image
         try:
-            with Image.open(abs_path) as img:
+            with Image.open(source_path) as img:
                 img.load()  # 强制加载全部数据，触发 truncated 等异常
                 # 转为 RGB（避免 RGBA 在 JPEG 中报错）
                 if img.mode in ('RGBA', 'P', 'LA'):
@@ -1713,6 +1723,7 @@ def api_config():
 
         # 重新初始化服务
         reload_services()
+        ffmpeg_util.reset_cache()   # ffmpeg_path 可能变化，重新检测
 
         return jsonify({'success': True, 'message': '配置已保存'})
     except Exception as e:
@@ -2066,6 +2077,16 @@ def api_cleanup_thumbs():
         return jsonify({'success': False, 'error': str(e)})
 
 
+@app.route('/api/system/ffmpeg')
+def api_system_ffmpeg():
+    """检测 ffmpeg（ugoira 动图功能依赖）"""
+    try:
+        info = ffmpeg_util.detect(force=True)
+        return jsonify({'success': True, 'data': info})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
 # ============ 删除（作者 / 作品） ============
 
 def _remove_local_image_files(paths: List[str]) -> int:
@@ -2082,6 +2103,14 @@ def _remove_local_image_files(paths: List[str]) -> int:
                 removed += 1
         except OSError as e:
             logger.warning(f"删除文件失败 {p}: {e}")
+        # 动图视频：同时删除同名封面
+        if os.path.splitext(p)[1].lower() in ('.webm', '.mp4', '.mkv', '.m4v'):
+            poster = p + '.jpg'
+            try:
+                if os.path.isfile(poster):
+                    os.remove(poster)
+            except OSError:
+                pass
         # 同步删除对应缩略图缓存
         if os.path.isdir(thumb_dir):
             thumb_path = os.path.join(thumb_dir, hashlib.md5(p.encode()).hexdigest() + '.jpg')

@@ -9,6 +9,41 @@
         return h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]';
     };
 
+    /** 是否为视频文件（ugoira 动图合成后的 webm/mp4） */
+    window.isVideoPath = function (p) {
+        return /\.(webm|mp4|m4v|mkv)$/i.test(p || '');
+    };
+
+    /**
+     * 在查看器中显示图片或动图。
+     * 动图：隐藏 <img>，用 <video> 自动循环播放；普通图片则相反。
+     */
+    window.setViewerMedia = function (imgEl, videoEl, filePath, url) {
+        if (!imgEl || !videoEl) return;
+        if (window.isVideoPath(filePath)) {
+            imgEl.style.display = 'none';
+            imgEl.removeAttribute('src');
+            videoEl.style.display = '';
+            if (videoEl.getAttribute('src') !== url) {
+                videoEl.src = url;
+            }
+            try { videoEl.currentTime = 0; } catch (e) {}
+            var p = videoEl.play();
+            if (p && p.catch) p.catch(function () {});
+        } else {
+            try { videoEl.pause(); } catch (e) {}
+            videoEl.removeAttribute('src');
+            videoEl.style.display = 'none';
+            imgEl.style.display = '';
+            imgEl.src = url;
+        }
+    };
+
+    /** 复制图片时，动图取封面（xxx.webm.jpg），普通图片取原路径 */
+    window.mediaCopyPath = function (p) {
+        return window.isVideoPath(p) ? (p + '.jpg') : p;
+    };
+
     /**
      * 轻量非阻塞提示（各页面通用）
      * 页面若自己定义了 showToast 会覆盖本实现（不影响既有页面）

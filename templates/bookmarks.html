@@ -708,6 +708,7 @@ select.btn {
     <div class="viewer-main">
         <button class="viewer-nav prev" id="viewerPrevBtn" onclick="viewerPrev()">‹</button>
         <img id="viewerImage" src="" alt="">
+        <video id="viewerVideo" class="viewer-media-video" playsinline loop muted controls></video>
         <button class="viewer-nav next" id="viewerNextBtn" onclick="viewerNext()">›</button>
     </div>
     <div class="viewer-thumbnails" id="viewerThumbnails"></div>
@@ -864,6 +865,7 @@ function renderGrid(items) {
             div.innerHTML = `
                 <div class="bm-thumb" data-card-idx="${i}">
                     ${thumbInner}
+                    ${isVideoPath(b.first_image_path) ? '<span class="media-badge">🎬 动图</span>' : ''}
                     ${removedBadge}
                     <span class="bm-badge-type ${restClass}">${restLabel}</span>
                     <span class="bm-badge-dl ${dlClass}">${dlLabel}</span>
@@ -1186,6 +1188,12 @@ async function openImageViewer(workId, startIndex) {
 
 function closeImageViewer() {
     document.getElementById('imageViewerOverlay').classList.remove('active');
+    const videoEl = document.getElementById('viewerVideo');
+    if (videoEl) {
+        try { videoEl.pause(); } catch (e) {}
+        videoEl.removeAttribute('src');
+        videoEl.style.display = 'none';
+    }
     viewerData = null;
     viewerIndex = 0;
 }
@@ -1194,9 +1202,11 @@ function showViewerImage() {
     if (!viewerData) return;
     const img = viewerData.images[viewerIndex];
     const viewerImg = document.getElementById('viewerImage');
+    const videoEl = document.getElementById('viewerVideo');
     const src = img.file_path;
-    // 大图查看器主图用 /original 路由加载原图，而非缩略图
-    viewerImg.src = src ? '/original/' + encodeURIComponent(src) : '';
+    // 大图查看器主图用 /original 路由加载原图，而非缩略图（动图自动切 video）
+    const url = src ? '/original/' + encodeURIComponent(src) : '';
+    setViewerMedia(viewerImg, videoEl, src, url);
 
     document.getElementById('viewerPageInfo').textContent =
         `${viewerIndex + 1} / ${viewerData.images.length}`;

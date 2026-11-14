@@ -51,12 +51,15 @@
             videoEl.autoplay = true;
             videoEl.preload = 'auto';
 
+            // 视频走 /video/ 路由：非 MP4 容器（如 VP9 webm）会被服务端转成 H.264 MP4，
+            // 否则部分浏览器（Chrome 报 MEDIA_ERR_DECODE）播放会"闪一下就没"
+            var playUrl = '/video/' + encodeURIComponent(filePath);
             // 同时校验 src：关闭查看器时各页面会 removeAttribute('src')，
             // 只用 data-media-src 判断会导致重开后不再设置 src（黑屏无反应）
             var current = videoEl.getAttribute('data-media-src');
-            if (current !== url || !videoEl.getAttribute('src')) {
-                videoEl.setAttribute('data-media-src', url);
-                videoEl.src = url;
+            if (current !== playUrl || !videoEl.getAttribute('src')) {
+                videoEl.setAttribute('data-media-src', playUrl);
+                videoEl.src = playUrl;
                 videoEl.load();
             }
 

@@ -1191,6 +1191,83 @@ def serve_original(filepath):
     return send_from_directory(directory, filename)
 
 
+# 视频转码缓存锁：同一文件的并发请求只转码一次，避免重复占用 CPU
+_video_locks: Dict[str, threading.Lock] = {}
+_video_locks_guard = threading.Lock()
+
+
+def _video_lock(key: str) -> threading.Lock:
+    with _video_locks_guard:
+        lock = _video_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _video_locks[key] = lock
+        return lock
+
+
+def _playable_mp4(abs_path: str) -> Optional[str]:
+    """
+    返回可被浏览器播放的 MP4 路径（非 MP4 容器按需用 ffmpeg 转码并缓存在 .video 目录）。
+
+    背景：部分环境无法解码 VP9 WebM（Chrome 报 MEDIA_ERR_DECODE），
+    表现为"点开大图后播放闪一下就停"。统一转 H.264 MP4 兼容性最好。
+    返回 None 表示转码失败。
+    """
+    import hashlib
+    ext = os.path.splitext(abs_path)[1].lower()
+    if ext == '.mp4':
+        return abs_path
+
+    try:
+        stat = os.stat(abs_path)
+    except OSError:
+        return None
+    # 缓存键包含文件大小与 mtime：重新下载/替换文件后自动失效
+    key = hashlib.md5(
+        f'{abs_path}|{stat.st_size}|{int(stat.st_mtime)}'.encode()).hexdigest()
+    cache_dir = os.path.join(os.path.abspath(get_config().download_path), '.video')
+    mp4_path = os.path.join(cache_dir, f'{key}.mp4')
+
+    if os.path.isfile(mp4_path) and os.path.getsize(mp4_path) > 0:
+        return mp4_path
+
+    with _video_lock(key):
+        if os.path.isfile(mp4_path) and os.path.getsize(mp4_path) > 0:
+            return mp4_path
+        from ffmpeg_util import encode_mp4
+        tmp_path = mp4_path + '.tmp.mp4'
+        logger.info(f'转码视频用于预览: {abs_path}')
+        if not encode_mp4(abs_path, tmp_path):
+            return None
+        try:
+            os.replace(tmp_path, mp4_path)
+        except OSError as e:
+            logger.warning(f'写入视频缓存失败 {mp4_path}: {e}')
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+            return None
+        return mp4_path
+
+
+@app.route('/video/<path:filepath>')
+def serve_video(filepath):
+    """提供可直接播放的视频（非 MP4 自动转码为 H.264 MP4 并缓存）"""
+    decoded_path = urllib.parse.unquote(filepath)
+    abs_path = os.path.abspath(decoded_path)
+    if not _is_path_within_download(abs_path):
+        return 'Forbidden', 403
+    if not os.path.exists(abs_path):
+        return 'Not Found', 404
+
+    playable = _playable_mp4(abs_path)
+    if not playable:
+        return 'Video Not Playable', 415
+    return send_from_directory(os.path.dirname(playable), os.path.basename(playable),
+                               mimetype='video/mp4', conditional=True)
+
+
 
 def is_local_request() -> bool:
     """判断请求是否来自本机（回环地址）"""

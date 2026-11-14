@@ -175,6 +175,55 @@ def extract_poster(video_path: str, poster_path: str, timeout: int = 120) -> boo
         return False
 
 
+def encode_mp4(src_path: str, dst_path: str, crf: int = 23,
+               timeout: int = 900) -> bool:
+    """
+    把视频转码成浏览器友好的 H.264 MP4（yuv420p + faststart，无音轨）。
+
+    背景：部分环境（含某些机器的 Chrome）无法解码 VP9 WebM，会报
+    MEDIA_ERR_DECODE（表现为"点开播放闪一下就停"），H.264 MP4 兼容性最好。
+
+    Returns:
+        成功返回 True；ffmpeg 不可用或转码失败返回 False。
+    """
+    info = detect()
+    exe = info.get('path')
+    if not exe:
+        logger.warning(f"未检测到 ffmpeg，无法转码 {src_path}")
+        return False
+
+    os.makedirs(os.path.dirname(dst_path) or '.', exist_ok=True)
+    cmd = [
+        exe, '-y', '-loglevel', 'error',
+        '-i', src_path,
+        '-an',
+        # H.264 要求宽高为偶数，奇数尺寸会导致编码失败
+        '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', str(crf),
+        '-pix_fmt', 'yuv420p',
+        '-movflags', '+faststart',
+        dst_path,
+    ]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=timeout, creationflags=_NO_WINDOW)
+        if proc.returncode != 0 or not os.path.isfile(dst_path) \
+                or os.path.getsize(dst_path) == 0:
+            logger.warning(f"视频转码失败 {src_path}: "
+                           f"{(proc.stderr or '').strip()[-300:]}")
+            _cleanup(dst_path)
+            return False
+        return True
+    except subprocess.TimeoutExpired:
+        logger.warning(f"视频转码超时 {src_path}")
+        _cleanup(dst_path)
+        return False
+    except Exception as e:
+        logger.warning(f"视频转码异常 {src_path}: {e}")
+        _cleanup(dst_path)
+        return False
+
+
 def _cleanup(path: str) -> None:
     """清理临时文件（静默）"""
     try:

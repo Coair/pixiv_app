@@ -23,7 +23,9 @@
         if (window.isVideoPath(filePath)) {
             imgEl.style.display = 'none';
             imgEl.removeAttribute('src');
-            videoEl.style.display = '';
+            // 必须显式用 block：CSS 里 video.viewer-media-video 默认 display:none，
+            // 设成空字符串会回退到该样式，导致动图大图不可见
+            videoEl.style.display = 'block';
             if (videoEl.getAttribute('src') !== url) {
                 videoEl.src = url;
             }

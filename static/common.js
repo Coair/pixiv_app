@@ -14,6 +14,22 @@
         return /\.(webm|mp4|m4v|mkv)$/i.test(p || '');
     };
 
+    /** 播放失败时的用户可见提示（只提示一次，避免刷屏） */
+    function reportMediaError(videoEl, err) {
+        var name = (err && err.name) || '';
+        var msg;
+        if (name === 'NotSupportedError') {
+            msg = '当前浏览器不支持该视频编码（WebM/VP9），请换 Chrome/Edge 打开';
+        } else if (name === 'NotAllowedError') {
+            msg = '浏览器拦截了自动播放，点击画面中的播放按钮即可';
+        } else {
+            var code = videoEl && videoEl.error ? videoEl.error.code : '';
+            msg = '视频播放失败' + (name ? '：' + name : '') + (code ? '（错误码 ' + code + '）' : '');
+        }
+        if (window.showToast) window.showToast(msg, 'error');
+        try { console.warn('[setViewerMedia] 播放失败:', name, videoEl && videoEl.error); } catch (e) {}
+    }
+
     /**
      * 在查看器中显示图片或动图。
      * 动图：隐藏 <img>，用 <video> 自动循环播放；普通图片则相反。
@@ -26,15 +42,41 @@
             // 必须显式用 block：CSS 里 video.viewer-media-video 默认 display:none，
             // 设成空字符串会回退到该样式，导致动图大图不可见
             videoEl.style.display = 'block';
-            if (videoEl.getAttribute('src') !== url) {
+
+            // muted/loop 用属性值设置：仅靠 HTML 属性在动态改 src 后不保证生效，
+            // 而 muted=false 会让浏览器按自动播放策略拦截 play()
+            videoEl.muted = true;
+            videoEl.loop = true;
+            videoEl.playsInline = true;
+            videoEl.autoplay = true;
+            videoEl.preload = 'auto';
+
+            // 同时校验 src：关闭查看器时各页面会 removeAttribute('src')，
+            // 只用 data-media-src 判断会导致重开后不再设置 src（黑屏无反应）
+            var current = videoEl.getAttribute('data-media-src');
+            if (current !== url || !videoEl.getAttribute('src')) {
+                videoEl.setAttribute('data-media-src', url);
                 videoEl.src = url;
+                videoEl.load();
             }
-            try { videoEl.currentTime = 0; } catch (e) {}
-            var p = videoEl.play();
-            if (p && p.catch) p.catch(function () {});
+
+            var playNow = function () {
+                try { videoEl.currentTime = 0; } catch (e) {}
+                var p = videoEl.play();
+                if (p && p.catch) {
+                    p.catch(function (err) { reportMediaError(videoEl, err); });
+                }
+            };
+            // 元数据就绪后再播放，避免对空元素 play() 导致立刻中止（表现为"闪一下"）
+            if (videoEl.readyState >= 2) {
+                playNow();
+            } else {
+                videoEl.addEventListener('canplay', playNow, { once: true });
+            }
         } else {
             try { videoEl.pause(); } catch (e) {}
             videoEl.removeAttribute('src');
+            videoEl.removeAttribute('data-media-src');
             videoEl.style.display = 'none';
             imgEl.style.display = '';
             imgEl.src = url;

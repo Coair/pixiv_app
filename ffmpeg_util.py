@@ -132,6 +132,58 @@ def make_poster(frame_path: str, poster_path: str) -> bool:
         return False
 
 
+def extract_poster(video_path: str, poster_path: str, timeout: int = 120) -> bool:
+    """
+    用 ffmpeg 抽取视频首帧生成 JPEG 封面（供列表缩略图/视频封面使用）。
+    适用于非本工具下载、缺少 xxx.webm.jpg 封面的视频文件。
+
+    Returns:
+        成功返回 True；ffmpeg 不可用或抽取失败返回 False。
+    """
+    info = detect()
+    exe = info.get('path')
+    if not exe:
+        logger.warning(f"未检测到 ffmpeg，无法生成视频封面 {video_path}")
+        return False
+
+    # 先写临时文件再原子替换，避免并发请求读到半截封面
+    tmp_path = poster_path + '.tmp.jpg'
+    try:
+        os.makedirs(os.path.dirname(poster_path) or '.', exist_ok=True)
+        proc = subprocess.run(
+            [exe, '-y', '-loglevel', 'error',
+             '-i', video_path,
+             '-frames:v', '1', '-q:v', '2', tmp_path],
+            capture_output=True, text=True, timeout=timeout,
+            creationflags=_NO_WINDOW,
+        )
+        if proc.returncode != 0 or not os.path.isfile(tmp_path) \
+                or os.path.getsize(tmp_path) == 0:
+            logger.warning(f"ffmpeg 抽取视频封面失败 {video_path}: "
+                           f"{(proc.stderr or '').strip()[-200:]}")
+            _cleanup(tmp_path)
+            return False
+        os.replace(tmp_path, poster_path)
+        return True
+    except subprocess.TimeoutExpired:
+        logger.warning(f"ffmpeg 抽取视频封面超时 {video_path}")
+        _cleanup(tmp_path)
+        return False
+    except Exception as e:
+        logger.warning(f"ffmpeg 抽取视频封面异常 {video_path}: {e}")
+        _cleanup(tmp_path)
+        return False
+
+
+def _cleanup(path: str) -> None:
+    """清理临时文件（静默）"""
+    try:
+        if os.path.isfile(path):
+            os.remove(path)
+    except OSError:
+        pass
+
+
 def convert_ugoira(frames_dir: str, frames: List[Dict], out_path: str,
                    timeout: int = 600) -> Tuple[bool, str]:
     """

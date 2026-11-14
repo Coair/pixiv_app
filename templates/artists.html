@@ -1603,8 +1603,9 @@ function renderArtViewerThumbnails() {
     if (!artViewerData) return;
     const container = document.getElementById('artViewerThumbnails');
     container.innerHTML = artViewerData.images.map((img, i) => {
+        // 缩略条用 /thumbnail/（240px 缓存），视频文件也能取到封面；原图留给主区域
         const src = img.file_path
-            ? (img.file_path.startsWith('/original/') ? img.file_path : '/original/' + encodeURIComponent(img.file_path))
+            ? '/thumbnail/' + encodeURIComponent(img.file_path)
             : '';
         return `<div class="art-viewer-thumb ${i === artViewerIndex ? 'active' : ''}" onclick="artViewerGoTo(${i})" title="第${img.page}页">
             ${src ? `<img data-src="${src}" alt="" onerror="this.style.display='none'" onload="this.style.display='block'">` : '<span style="color:var(--text-muted);font-size:18px;">🖼️</span>'}

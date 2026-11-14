@@ -1129,7 +1129,10 @@ def serve_thumbnail(filepath):
     if ext in ('.webm', '.mp4', '.mkv', '.m4v'):
         poster = abs_path + '.jpg'
         if not os.path.isfile(poster):
-            return 'Not Found', 404
+            # 缺少封面（如非本工具下载的视频）：用 ffmpeg 抽首帧自动生成
+            from ffmpeg_util import extract_poster
+            if not extract_poster(abs_path, poster):
+                return 'Not Found', 404
         source_path = poster
 
     # 检查是否已有缓存缩略图（下载目录 .thumb 下，按文件路径 hash 缓存）

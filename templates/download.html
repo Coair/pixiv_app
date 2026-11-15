@@ -230,6 +230,7 @@
             <div style="display:flex;gap:10px;align-items:center;">
                 <span id="failedCount" style="font-size:12px;color:var(--red);display:none;"></span>
                 <button class="btn btn-warning btn-sm" id="btnRetryFailed" style="display:none;" onclick="retryFailed()">🔄 重试失败</button>
+                <button class="btn btn-outline btn-sm" id="btnClearFailed" style="display:none;" onclick="clearFailedTasks()" title="删除失败任务记录（不影响已下载文件）">🧹 清空失败</button>
                 <button class="btn btn-outline btn-sm" onclick="clearTaskHistory()" title="清除已取消/已完成的旧任务记录">🗑 清空历史</button>
             </div>
         </div>
@@ -995,14 +996,37 @@ submitDownload = function(type, body) {
 function updateFailedBadge(count) {
     const badge = document.getElementById('failedCount');
     const btn = document.getElementById('btnRetryFailed');
+    const clearBtn = document.getElementById('btnClearFailed');
     if (!badge || !btn) return;
     if (count > 0) {
         badge.style.display = '';
         badge.textContent = `❌ ${count} 个失败任务`;
         btn.style.display = '';
+        if (clearBtn) clearBtn.style.display = '';
     } else {
         badge.style.display = 'none';
         btn.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+    }
+}
+
+async function clearFailedTasks() {
+    if (!confirm('确定清空所有失败任务记录吗？只删记录，不影响已下载的文件。')) return;
+    try {
+        const r = await fetch('/api/tasks/clear-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scope: 'failed' }),
+        });
+        const d = await r.json();
+        if (d.success) {
+            addLog(`🧹 ${d.message || '失败任务记录已清空'}`, 'success');
+            refreshTaskQueue();
+        } else {
+            addLog('清空失败: ' + (d.error || '未知错误'), 'error');
+        }
+    } catch (e) {
+        addLog('清空失败: ' + e.message, 'error');
     }
 }
 
@@ -1027,10 +1051,14 @@ async function retryFailed() {
 async function clearTaskHistory() {
     if (!confirm('确定清除所有历史任务记录（已取消/已完成）吗？此操作不影响任何文件。')) return;
     try {
-        const r = await fetch('/api/tasks/clear-history', { method: 'POST' });
+        const r = await fetch('/api/tasks/clear-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scope: 'history' }),
+        });
         const d = await r.json();
         if (d.success) {
-            addLog('🗑 历史任务记录已清空', 'success');
+            addLog(`🗑 ${d.message || '历史任务记录已清空'}`, 'success');
             refreshTaskQueue();
         } else {
             addLog('清空失败: ' + (d.error || '未知错误'), 'error');

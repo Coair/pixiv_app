@@ -217,6 +217,12 @@ class TaskManager:
         self._lock = threading.Lock()
         self._queue: List[TaskInfo] = []          # 排队中的任务
         self._current_task: Optional[TaskInfo] = None
+        # 正在被线程执行的任务：暂停时 _current_task 会被清空，但执行线程仍在跑，
+        # 因此单独记录，用于调度互斥和取消时通知下载线程
+        self._active_task: Optional[TaskInfo] = None
+        # 执行线程实际使用的下载器实例（reload_services 会重建全局 downloader，
+        # 必须用任务自己那份实例，否则取消/暂停标记设到了新对象上，线程收不到）
+        self._active_dl = None
         self._task_registry: Dict[str, TaskInfo] = {}  # 所有任务（包括已完成的，保留一段时间）
         self._scheduler_thread: Optional[threading.Thread] = None
         self._running = False
@@ -226,13 +232,25 @@ class TaskManager:
 
     def start(self, db_instance=None):
         """启动调度线程，注入数据库实例并从 DB 恢复未完成任务"""
-        if self._running:
-            return
-        self._db = db_instance
-        self._restore_tasks()
+        if db_instance is not None:
+            self._db = db_instance
+        found_tasks = False
+        if not self._running and not self._task_registry:
+            found_tasks = self._restore_tasks()
         self._running = True
-        self._scheduler_thread = threading.Thread(target=self._scheduler_loop, daemon=True)
-        self._scheduler_thread.start()
+        self._ensure_scheduler()
+        return found_tasks
+
+    def _ensure_scheduler(self):
+        """确保调度线程存活（线程意外退出时自动重建，避免任务永久卡在 pending）"""
+        with self._lock:
+            if self._scheduler_thread is not None and self._scheduler_thread.is_alive():
+                return
+            self._running = True
+            self._scheduler_thread = threading.Thread(
+                target=self._scheduler_loop, daemon=True, name='task-scheduler')
+            self._scheduler_thread.start()
+            logger.info('[TaskManager] 调度线程已启动')
 
     def _restore_tasks(self):
         """从数据库恢复未完成的任务（pending/running/paused）"""
@@ -284,14 +302,43 @@ class TaskManager:
 
         except Exception as e:
             logger.error(f"[TaskManager] 恢复任务失败: {e}")
+        return bool(self._task_registry)
+
+    def _heal_stuck_state(self):
+        """
+        自愈：修复会导致队列永久卡死的残留状态（必须在持有 _lock 时调用）。
+
+        1. _active_task 已是终态却未清空 → 清空，否则调度器永远不取新任务
+        2. _paused 为 True 但已没有任何暂停中的任务 → 解除全局暂停
+        """
+        dl = self._active_dl or downloader
+        if self._active_task is not None and self._active_task.status in (
+            TaskStatus.COMPLETED, TaskStatus.CANCELLED, TaskStatus.FAILED
+        ):
+            self._active_task = None
+            self._active_dl = None
+        if self._active_task is None and self._current_task is not None and \
+                self._current_task.status in (
+                    TaskStatus.COMPLETED, TaskStatus.CANCELLED, TaskStatus.FAILED):
+            self._current_task = None
+
+        if self._paused:
+            has_paused = any(
+                t.status == TaskStatus.PAUSED for t in self._task_registry.values())
+            if not has_paused:
+                logger.warning('[TaskManager] 检测到残留的全局暂停标记（无暂停任务），已自动解除')
+                self._paused = False
+                if dl:
+                    dl.paused = False
 
     def _scheduler_loop(self):
         """调度循环：从队列取任务执行（支持全局暂停）"""
         while self._running:
             task = None
             with self._lock:
-                # 全局暂停时，不取新任务；_current_task 也应为 None（暂停时已清空）
-                if not self._paused and self._current_task is None and self._queue:
+                self._heal_stuck_state()
+                # 有任务正在执行时不取新任务（_active_task 覆盖暂停后线程仍在跑的情况）
+                if not self._paused and self._active_task is None and self._queue:
                     # 跳过队列中已取消/已完成的任务（清理残余）
                     while self._queue:
                         candidate = self._queue[0]
@@ -304,6 +351,7 @@ class TaskManager:
                         task.status = TaskStatus.RUNNING
                         task.started_at = datetime.now().isoformat()
                         self._current_task = task
+                        self._active_task = task
 
             if task:
                 self._persist_task_status(task)  # 标记为 running
@@ -318,6 +366,14 @@ class TaskManager:
                         task.finished_at = datetime.now().isoformat()
                         self._persist_task_status(task)
                         if self._current_task == task:
+                            self._current_task = None
+                finally:
+                    # 执行线程结束后必须释放，否则后续任务永远排不上
+                    with self._lock:
+                        if self._active_task is task:
+                            self._active_task = None
+                            self._active_dl = None
+                        if self._current_task is task:
                             self._current_task = None
 
             # 清理过期的已完成任务
@@ -397,6 +453,9 @@ class TaskManager:
     def _execute_task(self, task: TaskInfo):
         """执行具体任务"""
         _, api_obj, dl, scan_obj = get_or_init_services()
+        # 记录本执行线程使用的下载器实例，暂停/取消时对同一实例下标记
+        self._active_dl = dl
+        logger.info(f'[task] {task.task_id} 开始执行 (dl={id(dl)})')
 
         # 重置 downloader 控制标记
         dl.reset_control_flags()
@@ -828,10 +887,26 @@ class TaskManager:
                 self._db.save_task(task_id, task_type, params, 'pending')
             except Exception as e:
                 logger.error(f"[TaskManager] 持久化任务失败 {task_id}: {e}")
+        # 调度线程意外退出时重建，避免新任务永远停在"排队中"
+        self._ensure_scheduler()
         return task_id
 
+    def _drop_persisted_task(self, task_id: str):
+        """删除持久化记录 + 清理内存中的终态任务（重试/清空共用）"""
+        if self._db:
+            try:
+                self._db.delete_task(task_id)
+            except Exception as e:
+                logger.error(f"[TaskManager] 删除任务记录失败 {task_id}: {e}")
+        with self._lock:
+            t = self._task_registry.get(task_id)
+            if t is not None and t.status in (
+                    TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+                del self._task_registry[task_id]
+                sse_queues.pop(task_id, None)
+
     def retry_task(self, task_id: str) -> Optional[str]:
-        """重试单个失败任务：依据持久化记录重建并重新排队，返回新 task_id"""
+        """重试单个失败任务：重建并重新排队，同时删除旧的失败记录"""
         if not self._db:
             return None
         p = self._db.get_persisted_task(task_id)
@@ -839,10 +914,13 @@ class TaskManager:
             return None
         params = dict(p.get('params') or {})
         params.pop('task_id', None)
-        return self.submit(p['task_type'], params)
+        new_id = self.submit(p['task_type'], params)
+        # 旧失败记录必须删掉：否则"失败任务"计数永远不减，还会被再次重试
+        self._drop_persisted_task(task_id)
+        return new_id
 
     def retry_all_failed(self) -> int:
-        """重试持久化表中所有失败任务，返回重试数量"""
+        """重试持久化表中所有失败任务，返回重试数量（旧的失败记录会被清理）"""
         if not self._db:
             return 0
         failed = self._db.get_persisted_tasks(status='failed')
@@ -852,14 +930,46 @@ class TaskManager:
             params.pop('task_id', None)
             try:
                 self.submit(p['task_type'], params)
+                self._drop_persisted_task(p['task_id'])
                 count += 1
             except Exception as e:
                 logger.error(f"[TaskManager] 重试任务失败 {p['task_id']}: {e}")
         return count
 
+    def clear_history(self, scope: str = 'history') -> int:
+        """
+        清空任务记录（DB + 内存）。
+
+        Args:
+            scope: history=已取消/已完成（默认）, failed=失败记录, all=全部终态任务
+
+        Returns:
+            删除的记录数
+        """
+        if not self._db:
+            return 0
+        if scope == 'failed':
+            removed = self._db.clear_failed_task_history()
+            statuses = (TaskStatus.FAILED,)
+        elif scope == 'all':
+            removed = self._db.clear_terminal_task_history(include_failed=True)
+            statuses = (TaskStatus.COMPLETED, TaskStatus.CANCELLED, TaskStatus.FAILED)
+        else:
+            removed = self._db.clear_terminal_task_history()
+            statuses = (TaskStatus.COMPLETED, TaskStatus.CANCELLED)
+
+        # 同步清理内存，避免页面仍能从注册表读到旧任务
+        # （跳过仍在执行的线程，否则任务对象被删后无法再通知它停止）
+        with self._lock:
+            for tid, t in list(self._task_registry.items()):
+                if t.status in statuses and t is not self._active_task:
+                    del self._task_registry[tid]
+                    sse_queues.pop(tid, None)
+        return removed
+
     def pause(self, task_id: str) -> bool:
         """暂停任务：设置全局暂停标记，停止所有任务（同时更新 DB）"""
-        dl = downloader
+        dl = self._active_dl or downloader
         with self._lock:
             task = self._task_registry.get(task_id)
             if task is None:
@@ -892,7 +1002,7 @@ class TaskManager:
 
     def resume(self, task_id: str) -> bool:
         """恢复暂停的任务：取消全局暂停标记，将暂停的任务放回队列（同时更新 DB）"""
-        dl = downloader
+        dl = self._active_dl or downloader
         with self._lock:
             task = self._task_registry.get(task_id)
             if task is None:
@@ -905,12 +1015,19 @@ class TaskManager:
                 if dl:
                     dl.paused = False
 
-                # 将当前暂停的任务放回队列头（恢复时优先执行）
-                task.status = TaskStatus.PENDING
-                task.add_log('info', '▶ 任务已恢复，等待执行')
-                emit_sse(task_id, 'status_change', {'status': 'pending'})
-                if task not in self._queue:
-                    self._queue.insert(0, task)  # 插入队头，优先执行
+                if self._active_task is task:
+                    # 执行线程还活着（阻塞在 check_pause），直接让它继续，
+                    # 不能重新入队，否则同一任务会被执行两次
+                    task.status = TaskStatus.RUNNING
+                    task.add_log('info', '▶ 任务已恢复')
+                    emit_sse(task_id, 'status_change', {'status': 'running'})
+                else:
+                    # 将当前暂停的任务放回队列头（恢复时优先执行）
+                    task.status = TaskStatus.PENDING
+                    task.add_log('info', '▶ 任务已恢复，等待执行')
+                    emit_sse(task_id, 'status_change', {'status': 'pending'})
+                    if task not in self._queue:
+                        self._queue.insert(0, task)  # 插入队头，优先执行
 
                 # 同时将其他暂停的任务也恢复为 pending 并放入队列
                 for t in self._task_registry.values():
@@ -927,16 +1044,20 @@ class TaskManager:
 
     def cancel(self, task_id: str) -> bool:
         """取消任务：清理所有相关引用，自动取消全局暂停（同时更新 DB）"""
-        dl = downloader
+        dl = self._active_dl or downloader
         with self._lock:
             task = self._task_registry.get(task_id)
             if task is None:
                 return False
 
-            if task.status in (TaskStatus.PENDING, TaskStatus.PAUSED):
+            if task.status in (TaskStatus.PENDING, TaskStatus.PAUSED, TaskStatus.RUNNING):
+                # 该任务的执行线程是否还活着（暂停时 _current_task 会清空，但线程仍在跑）
+                was_active = self._active_task is task
+
                 task.status = TaskStatus.CANCELLED
-                task.add_log('info', '任务已取消')
-                task.finished_at = datetime.now().isoformat()
+                task.add_log('info', '⏹ 取消中...' if was_active else '任务已取消')
+                if not was_active:
+                    task.finished_at = datetime.now().isoformat()
                 emit_sse(task_id, 'status_change', {'status': 'cancelled'})
                 emit_sse(task_id, 'complete', {'cancelled': True})
 
@@ -946,6 +1067,14 @@ class TaskManager:
                 # 清理 _current_task 引用（如果暂停时未正确清空）
                 if self._current_task == task:
                     self._current_task = None
+
+                # 关键：通知正在执行的下载线程。否则线程会一直卡在 check_pause()
+                # 里等待，任务显示已取消但实际仍在跑/永不退出
+                if was_active and dl:
+                    dl.cancelled = True
+                    dl.paused = False
+                    logger.info(f'[cancel] {task_id} 已通知执行线程 '
+                                f'(dl={id(dl)}, cancelled={dl.cancelled})')
 
                 # 如果取消了唯一的暂停任务，解除全局暂停
                 if self._paused:
@@ -958,18 +1087,6 @@ class TaskManager:
                         if dl:
                             dl.paused = False
 
-                self._persist_task_status(task)
-                return True
-            elif task.status == TaskStatus.RUNNING:
-                task.status = TaskStatus.CANCELLED
-                task.add_log('info', '⏹ 取消中...')
-                emit_sse(task_id, 'status_change', {'status': 'cancelled'})
-                if dl:
-                    dl.cancelled = True
-                    dl.paused = False  # 如果正在暂停中也唤醒
-
-                # 取消全局暂停标记
-                self._paused = False
                 self._persist_task_status(task)
                 return True
             return False
@@ -1977,11 +2094,24 @@ def api_tasks_retry_failed():
 
 @app.route('/api/tasks/clear-history', methods=['POST'])
 def api_tasks_clear_history():
-    """清空历史任务记录（已取消/已完成），避免残留脏数据污染统计"""
+    """
+    清空任务记录。
+
+    body: {"scope": "history" | "failed" | "all"}
+      - history（默认）：已取消/已完成
+      - failed：失败记录
+      - all：全部终态记录
+    """
     try:
-        db_obj, _, _, _ = get_or_init_services()
-        db_obj.clear_terminal_task_history()
-        return jsonify({'success': True, 'message': '历史任务记录已清空'})
+        payload = request.get_json(silent=True) or {}
+        scope = (payload.get('scope') or 'history').lower()
+        if scope not in ('history', 'failed', 'all'):
+            return jsonify({'success': False, 'error': 'scope 参数无效'})
+        removed = task_manager.clear_history(scope)
+        label = {'history': '历史任务记录', 'failed': '失败任务记录',
+                 'all': '历史与失败任务记录'}[scope]
+        return jsonify({'success': True, 'removed': removed,
+                        'message': f'已清空 {removed} 条{label}'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 

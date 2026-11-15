@@ -1423,13 +1423,31 @@ class Database:
                 return d
             return None
 
-    def clear_terminal_task_history(self):
-        """清空所有历史任务记录（已取消/已完成），不含可重试的失败任务"""
+    def clear_terminal_task_history(self, include_failed: bool = False) -> int:
+        """
+        清空历史任务记录（已取消/已完成）。
+
+        Args:
+            include_failed: True 时连失败记录一起删除
+        """
+        statuses = ['cancelled', 'completed']
+        if include_failed:
+            statuses.append('failed')
+        placeholders = ','.join('?' for _ in statuses)
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "DELETE FROM task_queue WHERE status IN ('cancelled', 'completed')"
+                f'DELETE FROM task_queue WHERE status IN ({placeholders})',
+                statuses
             )
+            conn.commit()
+            return cursor.rowcount
+
+    def clear_failed_task_history(self) -> int:
+        """清空失败任务记录（可重试列表），返回删除条数"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM task_queue WHERE status = 'failed'")
             conn.commit()
             return cursor.rowcount
 

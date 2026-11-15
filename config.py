@@ -27,8 +27,9 @@ class Config(BaseModel):
     )
 
     # 下载设置
-    delay: float = 2.0            # API请求延迟(秒)
-    download_delay: float = 0.3   # 图片下载延迟(秒)
+    # 防反爬间隔：默认 0（不限流）。需要时在「系统配置」页调大即可。
+    delay: float = 0.0            # API 请求间隔(秒)，0=无间隔
+    download_delay: float = 0.0   # 图片下载间隔(秒)，0=无间隔
     timeout: int = 30             # 请求超时(秒)
     chunk_size: int = 8192        # 下载块大小
 

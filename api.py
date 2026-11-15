@@ -443,9 +443,20 @@ class PixivAPI:
         return all_ids
 
     def wait(self, delay: float = None):
-        """等待（用于API请求限流）"""
-        time.sleep(delay if delay is not None else self.delay)
+        """等待（用于API请求限流；间隔为 0 时直接跳过，不做无谓睡眠）"""
+        seconds = self.delay if delay is None else delay
+        try:
+            seconds = float(seconds or 0)
+        except (TypeError, ValueError):
+            seconds = 0.0
+        if seconds > 0:
+            time.sleep(seconds)
 
     def download_wait(self):
-        """等待（用于图片下载限流，比API请求延迟短）"""
-        time.sleep(self.download_delay)
+        """等待（用于图片下载限流，比API请求延迟短；0 表示不限流）"""
+        try:
+            seconds = float(self.download_delay or 0)
+        except (TypeError, ValueError):
+            seconds = 0.0
+        if seconds > 0:
+            time.sleep(seconds)
